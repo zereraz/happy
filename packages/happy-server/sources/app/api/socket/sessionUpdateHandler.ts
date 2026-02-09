@@ -8,7 +8,51 @@ import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 
-export function sessionUpdateHandler(userId: string, socket: Socket, connection: ClientConnection) {
+/**
+ * Attempt to auto-resume a dead session by calling the daemon's resume-session RPC.
+ * Looks up the machineId that owns this session via AccessKey, then calls the
+ * daemon's registered `<machineId>:resume-session` RPC method.
+ *
+ * This is fire-and-forget from the message handler's perspective — the message
+ * is already stored in DB and will be picked up by the resumed session process
+ * once it reconnects.
+ */
+async function tryAutoResumeSession(userId: string, sessionId: string, rpcListeners: Map<string, Socket>): Promise<void> {
+    try {
+        // Look up which machine owns this session
+        const accessKey = await db.accessKey.findFirst({
+            where: { sessionId, accountId: userId },
+            select: { machineId: true }
+        });
+
+        if (!accessKey) {
+            log({ module: 'websocket' }, `[AUTO-RESUME] No access key found for session ${sessionId}, cannot auto-resume`);
+            return;
+        }
+
+        const machineId = accessKey.machineId;
+        const rpcMethod = `${machineId}:resume-session`;
+        const targetSocket = rpcListeners.get(rpcMethod);
+
+        if (!targetSocket || !targetSocket.connected) {
+            log({ module: 'websocket' }, `[AUTO-RESUME] Daemon not connected for machine ${machineId}, cannot auto-resume session ${sessionId}`);
+            return;
+        }
+
+        log({ module: 'websocket' }, `[AUTO-RESUME] Triggering resume for session ${sessionId} on machine ${machineId}`);
+
+        const response = await targetSocket.timeout(30000).emitWithAck('rpc-request', {
+            method: rpcMethod,
+            params: JSON.stringify({ sessionId })
+        });
+
+        log({ module: 'websocket' }, `[AUTO-RESUME] Resume response for session ${sessionId}: ${response}`);
+    } catch (error) {
+        log({ module: 'websocket', level: 'error' }, `[AUTO-RESUME] Error auto-resuming session ${sessionId}: ${error}`);
+    }
+}
+
+export function sessionUpdateHandler(userId: string, socket: Socket, connection: ClientConnection, rpcListeners: Map<string, Socket>) {
     socket.on('update-metadata', async (data: any, callback: (response: any) => void) => {
         try {
             const { sid, metadata, expectedVersion } = data;
@@ -238,6 +282,13 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     recipientFilter: { type: 'all-interested-in-session', sessionId: sid },
                     skipSenderConnection: connection
                 });
+
+                // Auto-resume: if no session-scoped connection is listening, try to resume
+                if (!eventRouter.hasSessionScopedConnection(userId, sid)) {
+                    log({ module: 'websocket' }, `[AUTO-RESUME] No session-scoped connection for ${sid}, attempting auto-resume`);
+                    // Fire-and-forget — message is already in DB, resumed process will pick it up
+                    tryAutoResumeSession(userId, sid, rpcListeners).catch(() => {});
+                }
             } catch (error) {
                 log({ module: 'websocket', level: 'error' }, `Error in message handler: ${error}`);
             }

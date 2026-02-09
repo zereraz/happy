@@ -227,6 +227,21 @@ class EventRouter {
         return this.userConnections.get(userId);
     }
 
+    /**
+     * Check if there's at least one session-scoped connection for a given session.
+     * Used to detect dead sessions that need auto-resume.
+     */
+    hasSessionScopedConnection(userId: string, sessionId: string): boolean {
+        const connections = this.userConnections.get(userId);
+        if (!connections) return false;
+        for (const conn of connections) {
+            if (conn.connectionType === 'session-scoped' && conn.sessionId === sessionId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // === EVENT EMISSION METHODS ===
 
     emitUpdate(params: {
