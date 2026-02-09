@@ -353,6 +353,16 @@ export function query(config: {
     }) as ChildProcessWithoutNullStreams
 
     // Handle stdin
+    // Attach error handler BEFORE any writes to prevent EPIPE from becoming
+    // an uncaught exception when the child process exits unexpectedly
+    child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'EPIPE' || error.code === 'ERR_STREAM_DESTROYED') {
+            logDebug(`Child stdin write failed (${error.code}) — child process likely exited`)
+        } else {
+            logDebug(`Child stdin error: ${error.message}`)
+        }
+    })
+
     let childStdin: Writable | null = null
     if (typeof prompt === 'string') {
         child.stdin.end()

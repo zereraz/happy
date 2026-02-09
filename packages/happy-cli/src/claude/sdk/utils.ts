@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { existsSync, readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
+import type { Writable } from 'node:stream'
 import { logger } from '@/ui/logger'
 import { isBun } from '@/utils/runtime'
 
@@ -185,16 +186,20 @@ export function logDebug(message: string): void {
 }
 
 /**
- * Stream async messages to stdin
+ * Stream async messages to stdin.
+ * Stops writing if the stream is destroyed (e.g. child process exited)
+ * or if the abort signal fires.
  */
 export async function streamToStdin(
     stream: AsyncIterable<unknown>,
-    stdin: NodeJS.WritableStream,
+    stdin: Writable,
     abort?: AbortSignal
 ): Promise<void> {
     for await (const message of stream) {
-        if (abort?.aborted) break
+        if (abort?.aborted || stdin.destroyed) break
         stdin.write(JSON.stringify(message) + '\n')
     }
-    stdin.end()
+    if (!stdin.destroyed) {
+        stdin.end()
+    }
 }
