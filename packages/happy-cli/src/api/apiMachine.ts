@@ -18,7 +18,7 @@ interface ServerToDaemonEvents {
     'rpc-registered': (data: { method: string }) => void;
     'rpc-unregistered': (data: { method: string }) => void;
     'rpc-error': (data: { type: string, error: string }) => void;
-    'server:resume-session': (data: { sessionId: string }) => void;
+    'server:resume-session': (data: { sessionId: string; resume?: { claudeSessionId: string | null; directory: string; flavor: string; encryptedSessionKey?: string } }) => void;
     auth: (data: { success: boolean, user: string }) => void;
     error: (data: { message: string }) => void;
 }
@@ -74,14 +74,14 @@ type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
-    resumeSession: (sessionId: string) => Promise<SpawnSessionResult>;
+    resumeSession: (sessionId: string, resume?: { claudeSessionId: string | null; directory: string; flavor: string; encryptedSessionKey?: string }) => Promise<SpawnSessionResult>;
 }
 
 export class ApiMachineClient {
     private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
     private keepAliveInterval: NodeJS.Timeout | null = null;
     private rpcHandlerManager: RpcHandlerManager;
-    private resumeSessionHandler: ((sessionId: string) => Promise<SpawnSessionResult>) | null = null;
+    private resumeSessionHandler: ((sessionId: string, resume?: { claudeSessionId: string | null; directory: string; flavor: string; encryptedSessionKey?: string }) => Promise<SpawnSessionResult>) | null = null;
 
     constructor(
         private token: string,
@@ -296,15 +296,15 @@ export class ApiMachineClient {
 
         // Direct (unencrypted) resume signal from server — used for auto-resume
         // when the server detects a message arrived for a session with no active listener
-        this.socket.on('server:resume-session', async (data: { sessionId: string }) => {
-            const { sessionId } = data;
-            logger.debug(`[API MACHINE] Received server:resume-session for ${sessionId}`);
+        this.socket.on('server:resume-session', async (data) => {
+            const { sessionId, resume } = data;
+            logger.debug(`[API MACHINE] Received server:resume-session for ${sessionId} (resume hints: ${resume ? 'present' : 'absent'})`);
             if (!sessionId || !this.resumeSessionHandler) {
                 logger.debug(`[API MACHINE] Cannot resume: sessionId=${sessionId}, handler=${!!this.resumeSessionHandler}`);
                 return;
             }
             try {
-                const result = await this.resumeSessionHandler(sessionId);
+                const result = await this.resumeSessionHandler(sessionId, resume);
                 logger.debug(`[API MACHINE] Auto-resume result for ${sessionId}: ${result.type}`);
             } catch (error) {
                 logger.debug(`[API MACHINE] Auto-resume error for ${sessionId}: ${error}`);

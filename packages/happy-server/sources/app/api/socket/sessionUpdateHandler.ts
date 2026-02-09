@@ -18,7 +18,7 @@ import { Socket } from "socket.io";
  * Fire-and-forget — the message is already stored in DB and will be picked up
  * by the resumed session process once it reconnects.
  */
-async function tryAutoResumeSession(userId: string, sessionId: string): Promise<void> {
+async function tryAutoResumeSession(userId: string, sessionId: string, resume?: { claudeSessionId: string | null; directory: string; flavor: string; encryptedSessionKey?: string }): Promise<void> {
     try {
         // Look up which machine owns this session
         const accessKey = await db.accessKey.findFirst({
@@ -55,7 +55,7 @@ async function tryAutoResumeSession(userId: string, sessionId: string): Promise<
 
         log({ module: 'websocket' }, `[AUTO-RESUME] Triggering resume for session ${sessionId} on machine ${machineId}`);
 
-        daemonSocket.emit('server:resume-session', { sessionId });
+        daemonSocket.emit('server:resume-session', { sessionId, ...(resume && { resume }) });
     } catch (error) {
         log({ module: 'websocket', level: 'error' }, `[AUTO-RESUME] Error auto-resuming session ${sessionId}: ${error}`);
     }
@@ -240,7 +240,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
         await receiveMessageLock.inLock(async () => {
             try {
                 websocketEventsCounter.inc({ event_type: 'message' });
-                const { sid, message, localId } = data;
+                const { sid, message, localId, resume } = data;
 
                 log({ module: 'websocket' }, `Received message from socket ${socket.id}: sessionId=${sid}, messageLength=${message.length} bytes, connectionType=${connection.connectionType}, connectionSessionId=${connection.connectionType === 'session-scoped' ? connection.sessionId : 'N/A'}`);
 
@@ -296,7 +296,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 if (!eventRouter.hasSessionScopedConnection(userId, sid)) {
                     log({ module: 'websocket' }, `[AUTO-RESUME] No session-scoped connection for ${sid}, attempting auto-resume`);
                     // Fire-and-forget — message is already in DB, resumed process will pick it up
-                    tryAutoResumeSession(userId, sid).catch(() => {});
+                    tryAutoResumeSession(userId, sid, resume).catch(() => {});
                 }
             } catch (error) {
                 log({ module: 'websocket', level: 'error' }, `Error in message handler: ${error}`);

@@ -508,6 +508,9 @@ class Sync {
             pending = [];
             this.pendingOutbox.set(sessionId, pending);
         }
+        // TODO: Resume hints for dead session auto-resume need to be added to v3 HTTP messages API
+        // Previously sent via WebSocket 'message' event alongside the encrypted message.
+        // With v3 HTTP API, these need to be sent as query params or headers on POST /v3/sessions/:id/messages.
         pending.push({
             localId,
             content: encryptedRawRecord
@@ -727,6 +730,7 @@ class Sync {
                     continue;
                 }
                 sessionKeys.set(session.id, decrypted);
+                this.sessionDataKeys.set(session.id, decrypted);
             } else {
                 sessionKeys.set(session.id, null);
             }

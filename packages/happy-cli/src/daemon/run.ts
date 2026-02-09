@@ -15,6 +15,7 @@ import { getEnvironmentInfo } from '@/ui/doctor';
 import { spawnHappyCLI } from '@/utils/spawnHappyCLI';
 import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readSettings, getActiveProfile, getEnvironmentVariables, validateProfileForAgent, getProfileEnvironmentVariables } from '@/persistence';
 
+import { decryptWithDataKey, decodeBase64 } from '@/api/encryption';
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
 import { startDaemonControlServer } from './controlServer';
 import { readFileSync } from 'fs';
@@ -168,6 +169,8 @@ export async function startDaemon(): Promise<void> {
     const pidToTrackedSession = new Map<number, TrackedSession>();
 
     // Dead session cache — sessions that died and can be resumed (keyed by happySessionId)
+    // In-memory only: survives within a single daemon lifetime.
+    // Cross-restart resume is handled by server-assisted path (app sends resume hints).
     const deadSessions = new Map<string, DeadSession>();
 
     // Session spawning awaiter system
@@ -520,7 +523,6 @@ export async function startDaemon(): Promise<void> {
           if (options.resumeEncryptionVariant) {
             resumeEnv.HAPPY_RESUME_ENCRYPTION_VARIANT = options.resumeEncryptionVariant;
           }
-
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true,  // Sessions stay alive when daemon stops
@@ -682,36 +684,85 @@ export async function startDaemon(): Promise<void> {
       pidToTrackedSession.delete(pid);
     };
 
-    // Resume a dead session — looks up dead session cache, calls spawnSession with resume fields
-    const resumeSession = async (sessionId: string): Promise<SpawnSessionResult> => {
-      logger.debug(`[DAEMON RUN] Resume session request for ${sessionId}`);
+    // Resume a dead session — looks up dead session cache first, falls back to
+    // server-provided resume hints (claudeSessionId, directory, flavor) when cache misses.
+    // Server-assisted path spawns a NEW Happy session with fresh encryption key but
+    // passes --resume <claudeSessionId> to Claude Code to continue the conversation.
+    const resumeSession = async (sessionId: string, resume?: { claudeSessionId: string | null; directory: string; flavor: string; encryptedSessionKey?: string }): Promise<SpawnSessionResult> => {
+      logger.debug(`[DAEMON RUN] Resume session request for ${sessionId} (server hints: ${resume ? 'present' : 'absent'})`);
 
       const dead = deadSessions.get(sessionId);
-      if (!dead) {
-        logger.debug(`[DAEMON RUN] Dead session ${sessionId} not found in cache`);
-        return { type: 'error', errorMessage: `Session ${sessionId} not found in dead session cache. It may have expired or the daemon was restarted.` };
+      if (dead) {
+        if (dead.intentionallyStopped) {
+          logger.debug(`[DAEMON RUN] Dead session ${sessionId} was intentionally stopped, refusing resume`);
+          return { type: 'error', errorMessage: `Session ${sessionId} was intentionally stopped. Please create a new session.` };
+        }
+
+        // Remove from dead sessions to prevent double-resume
+        deadSessions.delete(sessionId);
+        logger.debug(`[DAEMON RUN] Removed dead session ${sessionId} from cache, spawning resume`);
+
+        // Map flavor to agent type
+        const agent = (dead.flavor === 'codex' || dead.flavor === 'gemini') ? dead.flavor : 'claude' as const;
+
+        return spawnSession({
+          directory: dead.directory,
+          agent,
+          resumeHappySessionId: dead.happySessionId,
+          resumeClaudeSessionId: dead.claudeSessionId ?? undefined,
+          resumeEncryptionKeyBase64: dead.encryptionKeyBase64,
+          resumeEncryptionVariant: dead.encryptionVariant,
+        });
       }
 
-      if (dead.intentionallyStopped) {
-        logger.debug(`[DAEMON RUN] Dead session ${sessionId} was intentionally stopped, refusing resume`);
-        return { type: 'error', errorMessage: `Session ${sessionId} was intentionally stopped. Please create a new session.` };
+      // Server-assisted fallback: reuse SAME session with SAME encryption key.
+      // The app encrypts the session key with the machine's symmetric key and includes
+      // it in resume hints. We decrypt it here to reattach to the same session.
+      // If the key is missing, fall back to fresh session (message loss accepted).
+      if (resume?.claudeSessionId) {
+        const agent = (resume.flavor === 'codex' || resume.flavor === 'gemini') ? resume.flavor : 'claude' as const;
+
+        // Try to decrypt the session key from resume hints
+        let sessionKeyBase64: string | undefined;
+        if (resume.encryptedSessionKey && credentials.encryption.type === 'dataKey') {
+          try {
+            const decrypted = decryptWithDataKey(
+              decodeBase64(resume.encryptedSessionKey),
+              credentials.encryption.machineKey
+            );
+            if (typeof decrypted === 'string') {
+              sessionKeyBase64 = decrypted;
+              logger.debug(`[DAEMON RUN] Decrypted session key from resume hints for ${sessionId}`);
+            }
+          } catch (e) {
+            logger.debug(`[DAEMON RUN] Failed to decrypt session key from resume hints: ${e}`);
+          }
+        }
+
+        if (sessionKeyBase64) {
+          // Full resume: same session ID, same key, same everything
+          logger.debug(`[DAEMON RUN] Full server-assisted resume for ${sessionId} (same session, same key)`);
+          return spawnSession({
+            directory: resume.directory,
+            agent,
+            resumeHappySessionId: sessionId,
+            resumeClaudeSessionId: resume.claudeSessionId,
+            resumeEncryptionKeyBase64: sessionKeyBase64,
+            resumeEncryptionVariant: 'dataKey',
+          });
+        }
+
+        // Fallback: no session key available, create fresh session (message loss)
+        logger.debug(`[DAEMON RUN] Partial server-assisted resume for ${sessionId} — no session key, creating fresh session`);
+        return spawnSession({
+          directory: resume.directory,
+          agent,
+          resumeClaudeSessionId: resume.claudeSessionId,
+        });
       }
 
-      // Remove from dead sessions to prevent double-resume
-      deadSessions.delete(sessionId);
-      logger.debug(`[DAEMON RUN] Removed dead session ${sessionId} from cache, spawning resume`);
-
-      // Map flavor to agent type
-      const agent = (dead.flavor === 'codex' || dead.flavor === 'gemini') ? dead.flavor : 'claude' as const;
-
-      return spawnSession({
-        directory: dead.directory,
-        agent,
-        resumeHappySessionId: dead.happySessionId,
-        resumeClaudeSessionId: dead.claudeSessionId ?? undefined,
-        resumeEncryptionKeyBase64: dead.encryptionKeyBase64,
-        resumeEncryptionVariant: dead.encryptionVariant,
-      });
+      logger.debug(`[DAEMON RUN] Dead session ${sessionId} not found in cache and no server resume hints`);
+      return { type: 'error', errorMessage: `Session ${sessionId} not found in dead session cache and no resume hints provided.` };
     };
 
     // Start control server
@@ -798,7 +849,7 @@ export async function startDaemon(): Promise<void> {
         }
       }
 
-      // Prune dead sessions older than 24 hours
+      // Prune dead sessions older than 24 hours (in-memory only)
       const deadSessionTTL = 24 * 60 * 60 * 1000;
       for (const [sessionId, dead] of deadSessions.entries()) {
         if (Date.now() - dead.diedAt > deadSessionTTL) {

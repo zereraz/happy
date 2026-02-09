@@ -122,6 +122,15 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
 
     // Resume path — re-attach to an existing Happy session instead of creating a new one
     let response: Awaited<ReturnType<typeof api.getOrCreateSession>>;
+
+    // Claude-only resume: fresh Happy session but continue Claude conversation via --resume.
+    // Triggered by server-assisted resume when daemon has no encryption key for the old session.
+    const envClaudeResumeId = process.env.HAPPY_RESUME_CLAUDE_SESSION_ID;
+    if (envClaudeResumeId && !options.resumeSessionId) {
+        logger.debug(`[START] Claude-only resume detected: --resume ${envClaudeResumeId} (fresh Happy session)`);
+        options.claudeArgs = ['--resume', envClaudeResumeId, ...(options.claudeArgs || [])];
+    }
+
     if (options.resumeSessionId) {
         const resumeEncKeyB64 = process.env.HAPPY_RESUME_ENCRYPTION_KEY;
         const resumeClaudeSessionId = process.env.HAPPY_RESUME_CLAUDE_SESSION_ID;
