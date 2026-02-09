@@ -73,6 +73,7 @@ type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
+    resumeSession: (sessionId: string) => Promise<SpawnSessionResult>;
 }
 
 export class ApiMachineClient {
@@ -98,7 +99,8 @@ export class ApiMachineClient {
     setRPCHandlers({
         spawnSession,
         stopSession,
-        requestShutdown
+        requestShutdown,
+        resumeSession
     }: MachineRpcHandlers) {
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
@@ -153,6 +155,30 @@ export class ApiMachineClient {
             }, 100);
 
             return { message: 'Daemon stop request acknowledged, starting shutdown sequence...' };
+        });
+
+        // Register resume session handler — re-spawns a dead session with --resume
+        this.rpcHandlerManager.registerHandler('resume-session', async (params: any) => {
+            const { sessionId } = params || {};
+            logger.debug(`[API MACHINE] Resume session request: ${sessionId}`);
+
+            if (!sessionId) {
+                throw new Error('Session ID is required');
+            }
+
+            const result = await resumeSession(sessionId);
+
+            switch (result.type) {
+                case 'success':
+                    logger.debug(`[API MACHINE] Resumed session ${result.sessionId}`);
+                    return { type: 'success', sessionId: result.sessionId };
+
+                case 'error':
+                    throw new Error(result.errorMessage);
+
+                default:
+                    throw new Error(`Unexpected result type: ${(result as any).type}`);
+            }
         });
     }
 

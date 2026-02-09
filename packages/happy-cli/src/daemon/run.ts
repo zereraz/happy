@@ -3,7 +3,7 @@ import os from 'os';
 import * as tmp from 'tmp';
 
 import { ApiClient } from '@/api/api';
-import { TrackedSession } from './types';
+import { TrackedSession, DeadSession } from './types';
 import { MachineMetadata, DaemonState, Metadata } from '@/api/types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import { logger } from '@/ui/logger';
@@ -167,6 +167,9 @@ export async function startDaemon(): Promise<void> {
     // Setup state - key by PID
     const pidToTrackedSession = new Map<number, TrackedSession>();
 
+    // Dead session cache — sessions that died and can be resumed (keyed by happySessionId)
+    const deadSessions = new Map<string, DeadSession>();
+
     // Session spawning awaiter system
     const pidToAwaiter = new Map<number, (session: TrackedSession) => void>();
 
@@ -174,7 +177,7 @@ export async function startDaemon(): Promise<void> {
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
 
     // Handle webhook from happy session reporting itself
-    const onHappySessionWebhook = (sessionId: string, sessionMetadata: Metadata) => {
+    const onHappySessionWebhook = (sessionId: string, sessionMetadata: Metadata, encryptionKeyBase64?: string, encryptionVariant?: 'legacy' | 'dataKey') => {
       logger.debugLargeJson(`[DAEMON RUN] Session reported`, sessionMetadata);
 
       const pid = sessionMetadata.hostPid;
@@ -193,7 +196,11 @@ export async function startDaemon(): Promise<void> {
         // Update daemon-spawned session with reported data
         existingSession.happySessionId = sessionId;
         existingSession.happySessionMetadataFromLocalWebhook = sessionMetadata;
-        logger.debug(`[DAEMON RUN] Updated daemon-spawned session ${sessionId} with metadata`);
+        if (encryptionKeyBase64) {
+          existingSession.encryptionKeyBase64 = encryptionKeyBase64;
+          existingSession.encryptionVariant = encryptionVariant ?? 'dataKey';
+        }
+        logger.debug(`[DAEMON RUN] Updated daemon-spawned session ${sessionId} with metadata (encKey: ${encryptionKeyBase64 ? 'present' : 'absent'})`);
 
         // Resolve any awaiter for this PID
         const awaiter = pidToAwaiter.get(pid);
@@ -208,7 +215,9 @@ export async function startDaemon(): Promise<void> {
           startedBy: 'happy directly - likely by user from terminal',
           happySessionId: sessionId,
           happySessionMetadataFromLocalWebhook: sessionMetadata,
-          pid
+          pid,
+          encryptionKeyBase64: encryptionKeyBase64,
+          encryptionVariant: encryptionVariant ?? 'dataKey',
         };
         pidToTrackedSession.set(pid, trackedSession);
         logger.debug(`[DAEMON RUN] Registered externally-started session ${sessionId}`);
@@ -495,15 +504,31 @@ export async function startDaemon(): Promise<void> {
             '--started-by', 'daemon'
           ];
 
-          // TODO: In future, sessionId could be used with --resume to continue existing sessions
-          // For now, we ignore it - each spawn creates a new session
+          // Add resume flag if this is a session being re-spawned
+          if (options.resumeHappySessionId) {
+            args.push('--happy-resume-session', options.resumeHappySessionId);
+          }
+
+          // Build resume environment variables
+          const resumeEnv: Record<string, string> = {};
+          if (options.resumeClaudeSessionId) {
+            resumeEnv.HAPPY_RESUME_CLAUDE_SESSION_ID = options.resumeClaudeSessionId;
+          }
+          if (options.resumeEncryptionKeyBase64) {
+            resumeEnv.HAPPY_RESUME_ENCRYPTION_KEY = options.resumeEncryptionKeyBase64;
+          }
+          if (options.resumeEncryptionVariant) {
+            resumeEnv.HAPPY_RESUME_ENCRYPTION_VARIANT = options.resumeEncryptionVariant;
+          }
+
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true,  // Sessions stay alive when daemon stops
             stdio: ['ignore', 'pipe', 'pipe'],  // Capture stdout/stderr for debugging
             env: {
               ...process.env,
-              ...extraEnv
+              ...extraEnv,
+              ...resumeEnv
             }
           });
 
@@ -620,7 +645,13 @@ export async function startDaemon(): Promise<void> {
             }
           }
 
-          pidToTrackedSession.delete(pid);
+          // Cache dead session metadata before removing, but mark as intentionally stopped
+          onChildExited(pid);
+          const dead = deadSessions.get(sessionId);
+          if (dead) {
+            dead.intentionallyStopped = true;
+            logger.debug(`[DAEMON RUN] Marked dead session ${sessionId} as intentionally stopped`);
+          }
           logger.debug(`[DAEMON RUN] Removed session ${sessionId} from tracking`);
           return true;
         }
@@ -632,8 +663,55 @@ export async function startDaemon(): Promise<void> {
 
     // Handle child process exit
     const onChildExited = (pid: number) => {
+      const tracked = pidToTrackedSession.get(pid);
+      if (tracked?.happySessionId && tracked.happySessionMetadataFromLocalWebhook && tracked.encryptionKeyBase64) {
+        const meta = tracked.happySessionMetadataFromLocalWebhook;
+        deadSessions.set(tracked.happySessionId, {
+          happySessionId: tracked.happySessionId,
+          claudeSessionId: meta.claudeSessionId ?? null,
+          directory: meta.path,
+          encryptionKeyBase64: tracked.encryptionKeyBase64,
+          encryptionVariant: tracked.encryptionVariant ?? 'dataKey',
+          flavor: meta.flavor ?? 'claude',
+          diedAt: Date.now(),
+          metadata: meta,
+        });
+        logger.debug(`[DAEMON RUN] Cached dead session ${tracked.happySessionId} for potential resume (claudeSessionId: ${meta.claudeSessionId ?? 'none'})`);
+      }
       logger.debug(`[DAEMON RUN] Removing exited process PID ${pid} from tracking`);
       pidToTrackedSession.delete(pid);
+    };
+
+    // Resume a dead session — looks up dead session cache, calls spawnSession with resume fields
+    const resumeSession = async (sessionId: string): Promise<SpawnSessionResult> => {
+      logger.debug(`[DAEMON RUN] Resume session request for ${sessionId}`);
+
+      const dead = deadSessions.get(sessionId);
+      if (!dead) {
+        logger.debug(`[DAEMON RUN] Dead session ${sessionId} not found in cache`);
+        return { type: 'error', errorMessage: `Session ${sessionId} not found in dead session cache. It may have expired or the daemon was restarted.` };
+      }
+
+      if (dead.intentionallyStopped) {
+        logger.debug(`[DAEMON RUN] Dead session ${sessionId} was intentionally stopped, refusing resume`);
+        return { type: 'error', errorMessage: `Session ${sessionId} was intentionally stopped. Please create a new session.` };
+      }
+
+      // Remove from dead sessions to prevent double-resume
+      deadSessions.delete(sessionId);
+      logger.debug(`[DAEMON RUN] Removed dead session ${sessionId} from cache, spawning resume`);
+
+      // Map flavor to agent type
+      const agent = (dead.flavor === 'codex' || dead.flavor === 'gemini') ? dead.flavor : 'claude' as const;
+
+      return spawnSession({
+        directory: dead.directory,
+        agent,
+        resumeHappySessionId: dead.happySessionId,
+        resumeClaudeSessionId: dead.claudeSessionId ?? undefined,
+        resumeEncryptionKeyBase64: dead.encryptionKeyBase64,
+        resumeEncryptionVariant: dead.encryptionVariant,
+      });
     };
 
     // Start control server
@@ -642,7 +720,9 @@ export async function startDaemon(): Promise<void> {
       stopSession,
       spawnSession,
       requestShutdown: () => requestShutdown('happy-cli'),
-      onHappySessionWebhook
+      onHappySessionWebhook,
+      getDeadSessions: () => Array.from(deadSessions.values()),
+      resumeSession
     });
 
     // Write initial daemon state (no lock needed for state file)
@@ -682,6 +762,7 @@ export async function startDaemon(): Promise<void> {
     apiMachine.setRPCHandlers({
       spawnSession,
       stopSession,
+      resumeSession,
       requestShutdown: () => requestShutdown('happy-app')
     });
 
@@ -713,7 +794,16 @@ export async function startDaemon(): Promise<void> {
         } catch (error) {
           // Process is dead, remove from tracking
           logger.debug(`[DAEMON RUN] Removing stale session with PID ${pid} (process no longer exists)`);
-          pidToTrackedSession.delete(pid);
+          onChildExited(pid);
+        }
+      }
+
+      // Prune dead sessions older than 24 hours
+      const deadSessionTTL = 24 * 60 * 60 * 1000;
+      for (const [sessionId, dead] of deadSessions.entries()) {
+        if (Date.now() - dead.diedAt > deadSessionTTL) {
+          deadSessions.delete(sessionId);
+          logger.debug(`[DAEMON RUN] Pruned expired dead session ${sessionId} (died ${Math.round((Date.now() - dead.diedAt) / 60000)}min ago)`);
         }
       }
 

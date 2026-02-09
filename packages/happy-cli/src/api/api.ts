@@ -273,6 +273,44 @@ export class ApiClient {
     }
   }
 
+  /**
+   * Fetch a single session by ID (returns raw encrypted data).
+   * Used for dead session resume — caller provides their own encryption key.
+   */
+  async getSessionById(sessionId: string, encryptionKey: Uint8Array, encryptionVariant: 'legacy' | 'dataKey'): Promise<Session | null> {
+    try {
+      const response = await axios.get(
+        `${configuration.serverUrl}/v1/sessions/${sessionId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.credential.token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000
+        }
+      );
+
+      const raw = response.data.session;
+      return {
+        id: raw.id,
+        seq: raw.seq,
+        metadata: decrypt(encryptionKey, encryptionVariant, decodeBase64(raw.metadata)),
+        metadataVersion: raw.metadataVersion,
+        agentState: raw.agentState ? decrypt(encryptionKey, encryptionVariant, decodeBase64(raw.agentState)) : null,
+        agentStateVersion: raw.agentStateVersion,
+        encryptionKey,
+        encryptionVariant
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        logger.debug(`[API] Session ${sessionId} not found`);
+        return null;
+      }
+      logger.debug(`[API] [ERROR] Failed to get session by ID:`, error);
+      throw error;
+    }
+  }
+
   sessionSyncClient(session: Session): ApiSessionClient {
     return new ApiSessionClient(this.credential.token, session);
   }

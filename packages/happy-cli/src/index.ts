@@ -576,6 +576,8 @@ ${chalk.bold('To clean up runaway processes:')} Use ${chalk.cyan('happy doctor c
           process.exit(1)
         }
         options.jsRuntime = runtime
+      } else if (arg === '--happy-resume-session') {
+        options.resumeSessionId = args[++i]
       } else if (arg === '--claude-env') {
         // Parse KEY=VALUE environment variable to pass to Claude
         const envArg = args[++i]

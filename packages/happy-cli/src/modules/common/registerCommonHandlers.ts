@@ -135,6 +135,16 @@ export interface SpawnSessionOptions {
         // Note: TMUX_TMPDIR is used by tmux to store socket files when default /tmp is not suitable
         // Common use case: When /tmp has limited space or different permissions
     };
+
+    // Resume fields — used when re-spawning a dead session
+    /** Happy session ID to resume (reuse existing server session) */
+    resumeHappySessionId?: string;
+    /** Claude Code session ID to pass as --resume */
+    resumeClaudeSessionId?: string;
+    /** Per-session encryption key (base64) */
+    resumeEncryptionKeyBase64?: string;
+    /** Encryption variant */
+    resumeEncryptionVariant?: 'legacy' | 'dataKey';
 }
 
 export type SpawnSessionResult =

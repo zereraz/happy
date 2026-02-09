@@ -11,6 +11,35 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { configuration } from '@/configuration';
 
+async function daemonGet(path: string): Promise<{ error?: string } | any> {
+  const state = await readDaemonState();
+  if (!state?.httpPort) {
+    return { error: 'No daemon running, no state file found' };
+  }
+
+  try {
+    process.kill(state.pid, 0);
+  } catch (error) {
+    return { error: 'Daemon is not running, file is stale' };
+  }
+
+  try {
+    const timeout = process.env.HAPPY_DAEMON_HTTP_TIMEOUT ? parseInt(process.env.HAPPY_DAEMON_HTTP_TIMEOUT) : 10_000;
+    const response = await fetch(`http://127.0.0.1:${state.httpPort}${path}`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(timeout)
+    });
+
+    if (!response.ok) {
+      return { error: `Request failed: ${path}, HTTP ${response.status}` };
+    }
+
+    return await response.json();
+  } catch (error) {
+    return { error: `Request failed: ${path}, ${error instanceof Error ? error.message : 'Unknown error'}` };
+  }
+}
+
 async function daemonPost(path: string, body?: any): Promise<{ error?: string } | any> {
   const state = await readDaemonState();
   if (!state?.httpPort) {
@@ -61,11 +90,15 @@ async function daemonPost(path: string, body?: any): Promise<{ error?: string } 
 
 export async function notifyDaemonSessionStarted(
   sessionId: string,
-  metadata: Metadata
+  metadata: Metadata,
+  encryptionKeyBase64?: string,
+  encryptionVariant?: 'legacy' | 'dataKey'
 ): Promise<{ error?: string } | any> {
   return await daemonPost('/session-started', {
     sessionId,
-    metadata
+    metadata,
+    encryptionKeyBase64,
+    encryptionVariant
   });
 }
 
@@ -82,6 +115,15 @@ export async function stopDaemonSession(sessionId: string): Promise<boolean> {
 export async function spawnDaemonSession(directory: string, sessionId?: string): Promise<any> {
   const result = await daemonPost('/spawn-session', { directory, sessionId });
   return result;
+}
+
+export async function listDeadSessions(): Promise<any[]> {
+  const result = await daemonGet('/dead-sessions');
+  return result.deadSessions || [];
+}
+
+export async function resumeDaemonSession(sessionId: string): Promise<any> {
+  return await daemonPost('/resume-session', { sessionId });
 }
 
 export async function stopDaemonHttp(): Promise<void> {

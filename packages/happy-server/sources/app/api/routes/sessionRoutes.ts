@@ -305,6 +305,42 @@ export function sessionRoutes(app: Fastify) {
         }
     });
 
+    // Get a single session by ID
+    app.get('/v1/sessions/:sessionId', {
+        schema: {
+            params: z.object({
+                sessionId: z.string()
+            })
+        },
+        preHandler: app.authenticate
+    }, async (request, reply) => {
+        const userId = request.userId;
+        const { sessionId } = request.params;
+
+        const session = await db.session.findFirst({
+            where: { id: sessionId, accountId: userId }
+        });
+        if (!session) {
+            return reply.code(404).send({ error: 'Session not found' });
+        }
+
+        return reply.send({
+            session: {
+                id: session.id,
+                seq: session.seq,
+                metadata: session.metadata,
+                metadataVersion: session.metadataVersion,
+                agentState: session.agentState,
+                agentStateVersion: session.agentStateVersion,
+                dataEncryptionKey: session.dataEncryptionKey ? Buffer.from(session.dataEncryptionKey).toString('base64') : null,
+                active: session.active,
+                activeAt: session.lastActiveAt.getTime(),
+                createdAt: session.createdAt.getTime(),
+                updatedAt: session.updatedAt.getTime(),
+            }
+        });
+    });
+
     app.get('/v1/sessions/:sessionId/messages', {
         schema: {
             params: z.object({

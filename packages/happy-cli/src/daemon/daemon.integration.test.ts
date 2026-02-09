@@ -19,13 +19,15 @@ import { execSync, spawn } from 'child_process';
 import { existsSync, unlinkSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import path, { join } from 'path';
 import { configuration } from '@/configuration';
-import { 
-  listDaemonSessions, 
-  stopDaemonSession, 
-  spawnDaemonSession, 
-  stopDaemonHttp, 
-  notifyDaemonSessionStarted, 
-  stopDaemon
+import {
+  listDaemonSessions,
+  stopDaemonSession,
+  spawnDaemonSession,
+  stopDaemonHttp,
+  notifyDaemonSessionStarted,
+  stopDaemon,
+  listDeadSessions,
+  resumeDaemonSession
 } from '@/daemon/controlClient';
 import { readDaemonState, clearDaemonState } from '@/persistence';
 import { Metadata } from '@/api/types';
@@ -466,8 +468,177 @@ describe.skipIf(!await isServerHealthy())('Daemon Integration Tests', { timeout:
   });
 
   // TODO: Add a test to see if a corrupted file will work
-  
+
   // TODO: Test npm uninstall scenario - daemon should gracefully handle when happy-coder is uninstalled
   // Current behavior: daemon tries to spawn new daemon on version mismatch but dist/index.mjs is gone
   // Expected: daemon should detect missing entrypoint and either exit cleanly or at minimum not respawn infinitely
+
+  // ===== Dead Session Resume Tests =====
+
+  it('should cache dead session when spawned session is stopped', async () => {
+    // Spawn a session
+    const spawnResponse = await spawnDaemonSession('/tmp');
+    expect(spawnResponse.success).toBe(true);
+    const sessionId = spawnResponse.sessionId;
+
+    // Verify it's alive
+    const sessions = await listDaemonSessions();
+    expect(sessions.some((s: any) => s.happySessionId === sessionId)).toBe(true);
+
+    // Stop it — this kills the process and caches as dead
+    await stopDaemonSession(sessionId);
+
+    // Give time for onChildExited to fire
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Should no longer be in active sessions
+    const activeSessions = await listDaemonSessions();
+    expect(activeSessions.some((s: any) => s.happySessionId === sessionId)).toBe(false);
+
+    // Should be in dead sessions cache, marked as intentionally stopped
+    const dead = await listDeadSessions();
+    const deadSession = dead.find((d: any) => d.happySessionId === sessionId);
+    expect(deadSession).toBeDefined();
+    expect(deadSession.intentionallyStopped).toBe(true);
+  });
+
+  it('should pass encryption key through webhook and cache it in dead sessions', async () => {
+    const testEncKey = 'dGVzdC1lbmNyeXB0aW9uLWtleS0xMjM0NTY3ODkwYWJj'; // base64
+    const mockMetadata: Metadata = {
+      path: '/tmp',
+      host: 'test-host',
+      homeDir: '/test/home',
+      happyHomeDir: '/test/happy-home',
+      happyLibDir: '/test/happy-lib',
+      happyToolsDir: '/test/happy-tools',
+      hostPid: process.pid, // Use our own PID so process.kill(pid, 0) works
+      startedBy: 'terminal',
+      machineId: 'test-machine-enc'
+    };
+
+    // Report session with encryption key
+    await notifyDaemonSessionStarted('enc-test-session', mockMetadata, testEncKey, 'dataKey');
+
+    // Verify session is tracked
+    const sessions = await listDaemonSessions();
+    expect(sessions.some((s: any) => s.happySessionId === 'enc-test-session')).toBe(true);
+
+    // Stop session — should cache with encryption key
+    await stopDaemonSession('enc-test-session');
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Verify dead session has encryption key
+    const dead = await listDeadSessions();
+    const deadSession = dead.find((d: any) => d.happySessionId === 'enc-test-session');
+    expect(deadSession).toBeDefined();
+    expect(deadSession.encryptionKeyBase64).toBe(testEncKey);
+    expect(deadSession.encryptionVariant).toBe('dataKey');
+  });
+
+  it('should reject resume of intentionally stopped session', async () => {
+    // Spawn and intentionally stop
+    const spawnResponse = await spawnDaemonSession('/tmp');
+    expect(spawnResponse.success).toBe(true);
+    const sessionId = spawnResponse.sessionId;
+
+    await stopDaemonSession(sessionId);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Verify it's in dead sessions
+    const dead = await listDeadSessions();
+    expect(dead.some((d: any) => d.happySessionId === sessionId)).toBe(true);
+
+    // Attempt resume — should fail because intentionally stopped
+    const resumeResult = await resumeDaemonSession(sessionId);
+    expect(resumeResult.success).toBe(false);
+    expect(resumeResult.error).toContain('intentionally stopped');
+  });
+
+  it('should return error when resuming non-existent dead session', async () => {
+    const resumeResult = await resumeDaemonSession('non-existent-session-id');
+    expect(resumeResult.success).toBe(false);
+    expect(resumeResult.error).toContain('not found');
+  });
+
+  it('should resume a dead session that was not intentionally stopped', { timeout: 30_000 }, async () => {
+    // Spawn a session
+    const spawnResponse = await spawnDaemonSession('/tmp');
+    expect(spawnResponse.success).toBe(true);
+    const sessionId = spawnResponse.sessionId;
+
+    // Find PID and kill process directly (simulates crash, not intentional stop)
+    const sessions = await listDaemonSessions();
+    const session = sessions.find((s: any) => s.happySessionId === sessionId);
+    expect(session).toBeDefined();
+
+    try {
+      process.kill(session.pid, 'SIGKILL');
+    } catch {
+      // Process might already be dead
+    }
+
+    // Wait for onChildExited to fire and cache dead session
+    await waitFor(async () => {
+      const dead = await listDeadSessions();
+      return dead.some((d: any) => d.happySessionId === sessionId);
+    }, 5_000, 250);
+
+    // Verify dead session is NOT intentionally stopped
+    const dead = await listDeadSessions();
+    const deadSession = dead.find((d: any) => d.happySessionId === sessionId);
+    expect(deadSession).toBeDefined();
+    expect(deadSession.intentionallyStopped).toBeUndefined();
+
+    // Resume the session
+    const resumeResult = await resumeDaemonSession(sessionId);
+    expect(resumeResult.success).toBe(true);
+    expect(resumeResult.sessionId).toBeDefined();
+
+    // Dead session should be removed from cache after resume
+    const deadAfterResume = await listDeadSessions();
+    expect(deadAfterResume.some((d: any) => d.happySessionId === sessionId)).toBe(false);
+
+    // New session should appear in active sessions
+    const activeSessions = await listDaemonSessions();
+    expect(activeSessions.length).toBeGreaterThanOrEqual(1);
+
+    // Clean up
+    if (resumeResult.sessionId) {
+      await stopDaemonSession(resumeResult.sessionId);
+    }
+  });
+
+  it('should prevent double-resume of same dead session', { timeout: 30_000 }, async () => {
+    // Spawn and crash
+    const spawnResponse = await spawnDaemonSession('/tmp');
+    expect(spawnResponse.success).toBe(true);
+    const sessionId = spawnResponse.sessionId;
+
+    const sessions = await listDaemonSessions();
+    const session = sessions.find((s: any) => s.happySessionId === sessionId);
+    expect(session).toBeDefined();
+
+    try {
+      process.kill(session.pid, 'SIGKILL');
+    } catch {}
+
+    await waitFor(async () => {
+      const dead = await listDeadSessions();
+      return dead.some((d: any) => d.happySessionId === sessionId);
+    }, 5_000, 250);
+
+    // First resume succeeds
+    const resumeResult1 = await resumeDaemonSession(sessionId);
+    expect(resumeResult1.success).toBe(true);
+
+    // Second resume fails (removed from cache)
+    const resumeResult2 = await resumeDaemonSession(sessionId);
+    expect(resumeResult2.success).toBe(false);
+    expect(resumeResult2.error).toContain('not found');
+
+    // Clean up
+    if (resumeResult1.sessionId) {
+      await stopDaemonSession(resumeResult1.sessionId);
+    }
+  });
 });

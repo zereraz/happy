@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { logger } from '@/ui/logger';
 import { Metadata } from '@/api/types';
-import { TrackedSession } from './types';
+import { TrackedSession, DeadSession } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 
 export function startDaemonControlServer({
@@ -16,13 +16,17 @@ export function startDaemonControlServer({
   stopSession,
   spawnSession,
   requestShutdown,
-  onHappySessionWebhook
+  onHappySessionWebhook,
+  getDeadSessions,
+  resumeSession
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   requestShutdown: () => void;
-  onHappySessionWebhook: (sessionId: string, metadata: Metadata) => void;
+  onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryptionKeyBase64?: string, encryptionVariant?: 'legacy' | 'dataKey') => void;
+  getDeadSessions: () => DeadSession[];
+  resumeSession: (sessionId: string) => Promise<SpawnSessionResult>;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({
@@ -39,7 +43,9 @@ export function startDaemonControlServer({
       schema: {
         body: z.object({
           sessionId: z.string(),
-          metadata: z.any() // Metadata type from API
+          metadata: z.any(), // Metadata type from API
+          encryptionKeyBase64: z.string().optional(),
+          encryptionVariant: z.enum(['legacy', 'dataKey']).optional()
         }),
         response: {
           200: z.object({
@@ -48,10 +54,10 @@ export function startDaemonControlServer({
         }
       }
     }, async (request) => {
-      const { sessionId, metadata } = request.body;
+      const { sessionId, metadata, encryptionKeyBase64, encryptionVariant } = request.body;
 
-      logger.debug(`[CONTROL SERVER] Session started: ${sessionId}`);
-      onHappySessionWebhook(sessionId, metadata);
+      logger.debug(`[CONTROL SERVER] Session started: ${sessionId} (encKey: ${encryptionKeyBase64 ? 'present' : 'absent'})`);
+      onHappySessionWebhook(sessionId, metadata, encryptionKeyBase64, encryptionVariant);
 
       return { status: 'ok' as const };
     });
@@ -165,6 +171,71 @@ export function startDaemonControlServer({
             success: false,
             error: result.errorMessage
           };
+      }
+    });
+
+    // List dead sessions (cached for potential resume)
+    typed.get('/dead-sessions', {
+      schema: {
+        response: {
+          200: z.object({
+            deadSessions: z.array(z.object({
+              happySessionId: z.string(),
+              claudeSessionId: z.string().nullable(),
+              directory: z.string(),
+              encryptionKeyBase64: z.string(),
+              encryptionVariant: z.enum(['legacy', 'dataKey']),
+              flavor: z.string(),
+              diedAt: z.number(),
+              intentionallyStopped: z.boolean().optional()
+            }))
+          })
+        }
+      }
+    }, async () => {
+      const dead = getDeadSessions();
+      logger.debug(`[CONTROL SERVER] Listing ${dead.length} dead sessions`);
+      return {
+        deadSessions: dead.map(d => ({
+          happySessionId: d.happySessionId,
+          claudeSessionId: d.claudeSessionId,
+          directory: d.directory,
+          encryptionKeyBase64: d.encryptionKeyBase64,
+          encryptionVariant: d.encryptionVariant,
+          flavor: d.flavor,
+          diedAt: d.diedAt,
+          intentionallyStopped: d.intentionallyStopped
+        }))
+      };
+    });
+
+    // Resume a dead session
+    typed.post('/resume-session', {
+      schema: {
+        body: z.object({
+          sessionId: z.string()
+        }),
+        response: {
+          200: z.object({
+            success: z.boolean(),
+            sessionId: z.string().optional(),
+            error: z.string().optional()
+          })
+        }
+      }
+    }, async (request) => {
+      const { sessionId } = request.body;
+      logger.debug(`[CONTROL SERVER] Resume session request: ${sessionId}`);
+
+      const result = await resumeSession(sessionId);
+
+      switch (result.type) {
+        case 'success':
+          return { success: true, sessionId: result.sessionId };
+        case 'error':
+          return { success: false, error: result.errorMessage };
+        default:
+          return { success: false, error: `Unexpected result: ${(result as any).type}` };
       }
     });
 

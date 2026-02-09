@@ -16,6 +16,7 @@ import { parseSpecialCommand } from '@/parsers/specialCommands';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { configuration } from '@/configuration';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
+import { encodeBase64, decodeBase64 } from '@/api/encryption';
 import { initialMachineMetadata } from '@/daemon/run';
 import { startHappyServer } from '@/claude/utils/startHappyServer';
 import { startHookServer } from '@/claude/utils/startHookServer';
@@ -43,6 +44,8 @@ export interface StartOptions {
     noSandbox?: boolean
     /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
     jsRuntime?: JsRuntime
+    /** Happy session ID to resume (re-spawning a dead session) */
+    resumeSessionId?: string
 }
 
 export async function runClaude(credentials: Credentials, options: StartOptions = {}): Promise<void> {
@@ -116,59 +119,104 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         sandbox: sandboxConfig?.enabled ? sandboxConfig : null,
         dangerouslySkipPermissions,
     };
-    const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
 
-    // Handle server unreachable case - run Claude locally with hot reconnection
-    // Note: connectionState.notifyOffline() was already called by api.ts with error details
-    if (!response) {
-        let offlineSessionId: string | null = null;
+    // Resume path — re-attach to an existing Happy session instead of creating a new one
+    let response: Awaited<ReturnType<typeof api.getOrCreateSession>>;
+    if (options.resumeSessionId) {
+        const resumeEncKeyB64 = process.env.HAPPY_RESUME_ENCRYPTION_KEY;
+        const resumeClaudeSessionId = process.env.HAPPY_RESUME_CLAUDE_SESSION_ID;
+        const resumeEncVariant = (process.env.HAPPY_RESUME_ENCRYPTION_VARIANT || 'dataKey') as 'legacy' | 'dataKey';
 
-        const reconnection = startOfflineReconnection({
-            serverUrl: configuration.serverUrl,
-            onReconnected: async () => {
-                const resp = await api.getOrCreateSession({ tag: randomUUID(), metadata, state });
-                if (!resp) throw new Error('Server unavailable');
-                const session = api.sessionSyncClient(resp);
-                const scanner = await createSessionScanner({
-                    sessionId: null,
-                    workingDirectory,
-                    onMessage: (msg) => session.sendClaudeSessionMessage(msg)
-                });
-                if (offlineSessionId) scanner.onNewSession(offlineSessionId);
-                return { session, scanner };
-            },
-            onNotify: console.log,
-            onCleanup: () => {
-                // Scanner cleanup handled automatically when process exits
-            }
-        });
-
-        try {
-            await claudeLocal({
-                path: workingDirectory,
-                sessionId: null,
-                onSessionFound: (id) => { offlineSessionId = id; },
-                onThinkingChange: () => {},
-                abort: new AbortController().signal,
-                claudeEnvVars: options.claudeEnvVars,
-                claudeArgs: options.claudeArgs,
-                mcpServers: {},
-                allowedTools: [],
-                sandboxConfig,
-            });
-        } finally {
-            reconnection.cancel();
-            stopCaffeinate();
+        if (!resumeEncKeyB64) {
+            throw new Error('HAPPY_RESUME_ENCRYPTION_KEY env var is required for session resume');
         }
-        process.exit(0);
+
+        logger.debug(`[START] Resuming session ${options.resumeSessionId} (claudeSessionId: ${resumeClaudeSessionId || 'none'})`);
+
+        const encryptionKey = decodeBase64(resumeEncKeyB64);
+        response = await api.getSessionById(options.resumeSessionId, encryptionKey, resumeEncVariant);
+
+        if (!response) {
+            throw new Error(`Failed to resume session ${options.resumeSessionId}: session not found on server`);
+        }
+
+        // Override metadata with fresh running state while preserving server-side fields
+        metadata = {
+            ...response.metadata,
+            lifecycleState: 'running',
+            lifecycleStateSince: Date.now(),
+            hostPid: process.pid,
+            version: packageJson.version,
+        };
+
+        // Prepend --resume <claudeSessionId> to claudeArgs so Claude Code resumes conversation
+        if (resumeClaudeSessionId) {
+            options.claudeArgs = ['--resume', resumeClaudeSessionId, ...(options.claudeArgs || [])];
+            logger.debug(`[START] Added --resume ${resumeClaudeSessionId} to claude args`);
+        }
+
+        logger.debug(`[START] Session ${options.resumeSessionId} resumed from server`);
+    } else {
+        // Normal path — create a new session
+        response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+
+        // Handle server unreachable case - run Claude locally with hot reconnection
+        // Note: connectionState.notifyOffline() was already called by api.ts with error details
+        if (!response) {
+            let offlineSessionId: string | null = null;
+
+            const reconnection = startOfflineReconnection({
+                serverUrl: configuration.serverUrl,
+                onReconnected: async () => {
+                    const resp = await api.getOrCreateSession({ tag: randomUUID(), metadata, state });
+                    if (!resp) throw new Error('Server unavailable');
+                    const session = api.sessionSyncClient(resp);
+                    const scanner = await createSessionScanner({
+                        sessionId: null,
+                        workingDirectory,
+                        onMessage: (msg) => session.sendClaudeSessionMessage(msg)
+                    });
+                    if (offlineSessionId) scanner.onNewSession(offlineSessionId);
+                    return { session, scanner };
+                },
+                onNotify: console.log,
+                onCleanup: () => {
+                    // Scanner cleanup handled automatically when process exits
+                }
+            });
+
+            try {
+                await claudeLocal({
+                    path: workingDirectory,
+                    sessionId: null,
+                    onSessionFound: (id) => { offlineSessionId = id; },
+                    onThinkingChange: () => {},
+                    abort: new AbortController().signal,
+                    claudeEnvVars: options.claudeEnvVars,
+                    claudeArgs: options.claudeArgs,
+                    mcpServers: {},
+                    allowedTools: [],
+                    sandboxConfig,
+                });
+            } finally {
+                reconnection.cancel();
+                stopCaffeinate();
+            }
+            process.exit(0);
+        }
     }
 
     logger.debug(`Session created: ${response.id}`);
 
-    // Always report to daemon if it exists
+    // Always report to daemon if it exists (include encryption key for dead session resume)
     try {
         logger.debug(`[START] Reporting session ${response.id} to daemon`);
-        const result = await notifyDaemonSessionStarted(response.id, metadata);
+        const result = await notifyDaemonSessionStarted(
+            response.id,
+            metadata,
+            encodeBase64(response.encryptionKey),
+            response.encryptionVariant
+        );
         if (result.error) {
             logger.debug(`[START] Failed to report to daemon (may not be running):`, result.error);
         } else {
@@ -196,6 +244,19 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
 
     // Create realtime session
     const session = api.sessionSyncClient(response);
+
+    // For resumed sessions, immediately push updated metadata to server
+    // so mobile app knows the session is alive again
+    if (options.resumeSessionId) {
+        session.updateMetadata((currentMetadata) => ({
+            ...currentMetadata,
+            lifecycleState: 'running',
+            lifecycleStateSince: Date.now(),
+            hostPid: process.pid,
+            version: packageJson.version,
+        }));
+        logger.debug('[START] Pushed resumed session metadata to server');
+    }
 
     // Start Happy MCP server
     const happyServer = await startHappyServer(session);
