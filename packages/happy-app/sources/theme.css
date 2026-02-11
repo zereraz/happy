@@ -41,3 +41,22 @@
 ::-webkit-scrollbar:vertical {
     width: 12px;
 }
+
+/* Text selection — force all rendered text to be selectable on web/Tauri.
+   React Native Web's `selectable` prop doesn't reliably set CSS user-select
+   in Tauri's webview, especially across nested <Text>/<span> elements
+   inside ScrollViews and code blocks. */
+span, p, pre, code, div[dir="auto"] {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* Prevent selection on interactive elements */
+[role="button"], button, input, textarea {
+    -webkit-user-select: none;
+    user-select: none;
+}
+textarea {
+    -webkit-user-select: text;
+    user-select: text;
+}
