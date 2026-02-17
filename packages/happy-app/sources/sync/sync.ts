@@ -61,6 +61,14 @@ type OutboxMessage = {
     content: string;
 };
 
+type SessionResumeHints = {
+    machineId: string;
+    claudeSessionId?: string | null;
+    directory?: string;
+    flavor?: string;
+    encryptedSessionKey?: string;
+};
+
 class Sync {
     private static readonly BACKGROUND_SEND_TIMEOUT_MS = 30_000;
     encryption!: Encryption;
@@ -74,6 +82,7 @@ class Sync {
     private sendAbortControllers = new Map<string, AbortController>();
     private sessionLastSeq = new Map<string, number>();
     private pendingOutbox = new Map<string, OutboxMessage[]>();
+    private resumeHintsMap = new Map<string, SessionResumeHints>();
     private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
     private sessionQueueProcessing = new Set<string>();
     private sessionMessageLocks = new Map<string, AsyncLock>();
@@ -508,9 +517,28 @@ class Sync {
             pending = [];
             this.pendingOutbox.set(sessionId, pending);
         }
-        // TODO: Resume hints for dead session auto-resume need to be added to v3 HTTP messages API
-        // Previously sent via WebSocket 'message' event alongside the encrypted message.
-        // With v3 HTTP API, these need to be sent as query params or headers on POST /v3/sessions/:id/messages.
+
+        // Build resume hints for dead session auto-resume (sent alongside v3 HTTP messages).
+        // These enable the server to signal the daemon to restart a dead session.
+        const metadata = session.metadata;
+        if (metadata?.machineId) {
+            const hints: SessionResumeHints = {
+                machineId: metadata.machineId,
+                claudeSessionId: metadata.claudeSessionId ?? null,
+                directory: metadata.path,
+                flavor: metadata.flavor ?? 'claude',
+            };
+            // Encrypt session data key for the machine (tier 2: same-key resume)
+            const sessionKey = this.sessionDataKeys.get(sessionId);
+            const machineEnc = this.encryption.getMachineEncryption(metadata.machineId);
+            if (sessionKey && machineEnc) {
+                try {
+                    hints.encryptedSessionKey = await machineEnc.encryptRaw(encodeBase64(sessionKey));
+                } catch { /* best-effort — tier 1/3 still work without this */ }
+            }
+            this.resumeHintsMap.set(sessionId, hints);
+        }
+
         pending.push({
             localId,
             content: encryptedRawRecord
@@ -1545,13 +1573,15 @@ class Sync {
         const controller = new AbortController();
         this.sendAbortControllers.set(sessionId, controller);
         try {
+            const resumeHints = this.resumeHintsMap.get(sessionId);
             const response = await apiSocket.request(`/v3/sessions/${sessionId}/messages`, {
                 method: 'POST',
                 body: JSON.stringify({
                     messages: batch.map((message) => ({
                         localId: message.localId,
                         content: message.content
-                    }))
+                    })),
+                    ...(resumeHints && { resume: resumeHints })
                 }),
                 headers: {
                     'Content-Type': 'application/json'
