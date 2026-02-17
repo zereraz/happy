@@ -7,81 +7,7 @@ import { AsyncLock } from "@/utils/lock";
 import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
-
-/**
- * Attempt to auto-resume a dead session by finding the daemon's machine-scoped
- * connection via eventRouter and emitting a direct `server:resume-session` event.
- *
- * This bypasses the encrypted RPC channel since the server doesn't have encryption
- * keys. The daemon listens for this event separately on its websocket connection.
- *
- * When pendingUpdate is provided, waits for the session-scoped connection to appear
- * after resume and re-delivers the message that triggered the resume.
- */
-async function tryAutoResumeSession(userId: string, sessionId: string, resume?: { claudeSessionId: string | null; directory: string; flavor: string; machineId?: string; encryptedSessionKey?: string }, pendingUpdate?: UpdatePayload): Promise<void> {
-    try {
-        // Get machineId from resume hints (sent by the app alongside messages)
-        const machineId = resume?.machineId;
-
-        if (!machineId) {
-            log({ module: 'websocket' }, `[AUTO-RESUME] No machineId in resume hints for session ${sessionId}, cannot auto-resume`);
-            return;
-        }
-
-        // Find the daemon's machine-scoped connection via eventRouter
-        const connections = eventRouter.getConnections(userId);
-        if (!connections) {
-            log({ module: 'websocket' }, `[AUTO-RESUME] No connections for user, cannot auto-resume session ${sessionId}`);
-            return;
-        }
-
-        let daemonSocket: Socket | null = null;
-        for (const conn of connections) {
-            if (conn.connectionType === 'machine-scoped' && conn.machineId === machineId) {
-                daemonSocket = conn.socket;
-                break;
-            }
-        }
-
-        if (!daemonSocket || !daemonSocket.connected) {
-            log({ module: 'websocket' }, `[AUTO-RESUME] Daemon not connected for machine ${machineId}, cannot auto-resume session ${sessionId}`);
-            return;
-        }
-
-        log({ module: 'websocket' }, `[AUTO-RESUME] Triggering resume for session ${sessionId} on machine ${machineId}`);
-
-        daemonSocket.emit('server:resume-session', { sessionId, ...(resume && { resume }) });
-
-        // Wait for session-scoped connection to appear, then re-deliver the triggering message
-        if (pendingUpdate) {
-            const POLL_INTERVAL = 500;
-            const TIMEOUT = 30_000;
-            const start = Date.now();
-
-            while (Date.now() - start < TIMEOUT) {
-                await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
-
-                if (eventRouter.hasSessionScopedConnection(userId, sessionId)) {
-                    // Find the session-scoped connection and emit directly to it
-                    const currentConnections = eventRouter.getConnections(userId);
-                    if (currentConnections) {
-                        for (const conn of currentConnections) {
-                            if (conn.connectionType === 'session-scoped' && conn.sessionId === sessionId) {
-                                conn.socket.emit('update', pendingUpdate);
-                                log({ module: 'websocket' }, `[AUTO-RESUME] Re-delivered pending message to resumed session ${sessionId} (waited ${Date.now() - start}ms)`);
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-
-            log({ module: 'websocket' }, `[AUTO-RESUME] Timeout waiting for session-scoped connection for ${sessionId} (${TIMEOUT}ms)`);
-        }
-    } catch (error) {
-        log({ module: 'websocket', level: 'error' }, `[AUTO-RESUME] Error auto-resuming session ${sessionId}: ${error}`);
-    }
-}
+import { tryAutoResumeSession } from "@/app/api/utils/autoResume";
 
 export function sessionUpdateHandler(userId: string, socket: Socket, connection: ClientConnection) {
     socket.on('update-metadata', async (data: any, callback: (response: any) => void) => {
@@ -317,8 +243,12 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 // Auto-resume: if no session-scoped connection is listening, try to resume
                 if (!eventRouter.hasSessionScopedConnection(userId, sid)) {
                     log({ module: 'websocket' }, `[AUTO-RESUME] No session-scoped connection for ${sid}, attempting auto-resume`);
-                    // Fire-and-forget — triggers resume and waits to re-deliver the message
-                    tryAutoResumeSession(userId, sid, resume, updatePayload).catch(() => {});
+                    const resumeMachineId = resume?.machineId;
+                    if (resumeMachineId) {
+                        tryAutoResumeSession(userId, sid, { ...resume, machineId: resumeMachineId }, updatePayload).catch(() => {});
+                    } else {
+                        log({ module: 'websocket' }, `[AUTO-RESUME] No machineId in resume hints for ${sid}, cannot auto-resume`);
+                    }
                 }
             } catch (error) {
                 log({ module: 'websocket', level: 'error' }, `Error in message handler: ${error}`);

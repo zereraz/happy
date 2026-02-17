@@ -1,6 +1,8 @@
-import { buildNewMessageUpdate, eventRouter } from "@/app/events/eventRouter";
+import { buildNewMessageUpdate, eventRouter, UpdatePayload } from "@/app/events/eventRouter";
+import { tryAutoResumeSession } from "@/app/api/utils/autoResume";
 import { db } from "@/storage/db";
 import { allocateSessionSeqBatch, allocateUserSeq } from "@/storage/seq";
+import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { z } from "zod";
 import { type Fastify } from "../types";
@@ -14,7 +16,14 @@ const sendMessagesBodySchema = z.object({
     messages: z.array(z.object({
         content: z.string(),
         localId: z.string().min(1)
-    })).min(1).max(100)
+    })).min(1).max(100),
+    resume: z.object({
+        machineId: z.string(),
+        claudeSessionId: z.string().nullable().optional(),
+        directory: z.string().optional(),
+        flavor: z.string().optional(),
+        encryptedSessionKey: z.string().optional()
+    }).optional()
 });
 
 type SelectedMessage = {
@@ -193,6 +202,7 @@ export function v3SessionRoutes(app: Fastify) {
             };
         });
 
+        let lastUpdatePayload: UpdatePayload | undefined;
         for (const message of txResult.createdMessages) {
             const content = message.localId ? contentByLocalId.get(message.localId) : null;
             if (!content) {
@@ -212,6 +222,32 @@ export function v3SessionRoutes(app: Fastify) {
                 payload: updatePayload,
                 recipientFilter: { type: 'all-interested-in-session', sessionId }
             });
+            lastUpdatePayload = updatePayload;
+        }
+
+        // Auto-resume: if new messages were created and no session-scoped connection
+        // is listening, try to resume the dead session via its daemon.
+        if (lastUpdatePayload && !eventRouter.hasSessionScopedConnection(userId, sessionId)) {
+            log({ module: 'v3-messages' }, `[AUTO-RESUME] No session-scoped connection for ${sessionId}, attempting auto-resume`);
+
+            // Prefer client-provided resume hints (includes claudeSessionId, directory,
+            // encryptedSessionKey for tier 2/3). Fall back to AccessKey lookup (tier 1 only).
+            let resumeHints = request.body.resume;
+            if (!resumeHints) {
+                const accessKey = await db.accessKey.findFirst({
+                    where: { sessionId, accountId: userId },
+                    select: { machineId: true }
+                });
+                if (accessKey) {
+                    resumeHints = { machineId: accessKey.machineId };
+                }
+            }
+
+            if (resumeHints) {
+                tryAutoResumeSession(userId, sessionId, resumeHints, lastUpdatePayload).catch(() => {});
+            } else {
+                log({ module: 'v3-messages' }, `[AUTO-RESUME] No resume hints or AccessKey for session ${sessionId}, cannot auto-resume`);
+            }
         }
 
         return reply.send({
