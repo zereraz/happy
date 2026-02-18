@@ -5,9 +5,9 @@ const name = {
     production: "Happy"
 }[variant];
 const bundleId = {
-    development: "com.slopus.happy.dev",
-    preview: "com.slopus.happy.preview",
-    production: "com.ex3ndr.happy"
+    development: "com.zereraz.happy.dev",
+    preview: "com.zereraz.happy.preview",
+    production: "com.zereraz.happy"
 }[variant];
 
 export default {
