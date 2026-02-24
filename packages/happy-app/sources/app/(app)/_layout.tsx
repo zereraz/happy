@@ -118,6 +118,12 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
+                name="settings/fork"
+                options={{
+                    headerTitle: t('settings.forkFlags'),
+                }}
+            />
+            <Stack.Screen
                 name="terminal/connect"
                 options={{
                     headerTitle: t('navigation.connectTerminal'),

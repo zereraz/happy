@@ -1118,6 +1118,10 @@ export function useSetting<K extends keyof Settings>(name: K): Settings[K] {
     return storage(useShallow((state) => state.settings[name]));
 }
 
+export function useForkFlag(key: string): boolean {
+    return storage(useShallow((state) => (state.settings.forkFlags ?? {})[key] ?? false));
+}
+
 export function useLocalSettings(): LocalSettings {
     return storage(useShallow((state) => state.localSettings));
 }

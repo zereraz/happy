@@ -10,7 +10,7 @@ import { Avatar } from './Avatar';
 import { ActiveSessionsGroup } from './ActiveSessionsGroup';
 import { ActiveSessionsGroupCompact } from './ActiveSessionsGroupCompact';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSetting } from '@/sync/storage';
+import { useSetting, useForkFlag } from '@/sync/storage';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
 import { Typography } from '@/constants/Typography';
 import { Session } from '@/sync/storageTypes';
@@ -202,6 +202,7 @@ export function SessionsList() {
     const isTablet = useIsTablet();
     const navigateToSession = useNavigateToSession();
     const compactSessionView = useSetting('compactSessionView');
+    const customSidebar = useForkFlag('customSidebar');
     const router = useRouter();
     const selectable = isTablet;
     const experiments = useSetting('experiments');
@@ -279,8 +280,9 @@ export function SessionsList() {
                 const prevItem = index > 0 && dataWithSelected ? dataWithSelected[index - 1] : null;
                 const nextItem = index < (dataWithSelected?.length || 0) - 1 && dataWithSelected ? dataWithSelected[index + 1] : null;
 
-                const isFirst = prevItem?.type === 'header';
-                const isLast = nextItem?.type === 'header' || nextItem == null || nextItem?.type === 'active-sessions';
+                // Custom sidebar: every session is a standalone card
+                const isFirst = customSidebar ? true : prevItem?.type === 'header';
+                const isLast = customSidebar ? true : (nextItem?.type === 'header' || nextItem == null || nextItem?.type === 'active-sessions');
                 const isSingle = isFirst && isLast;
 
                 return (
@@ -293,7 +295,7 @@ export function SessionsList() {
                     />
                 );
         }
-    }, [pathname, dataWithSelected, compactSessionView]);
+    }, [pathname, dataWithSelected, compactSessionView, customSidebar]);
 
 
     // Remove this section as we'll use FlatList for all items now

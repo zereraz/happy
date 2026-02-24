@@ -78,6 +78,7 @@ export default {
         },
         plugins: [
             require("./plugins/withEinkCompatibility.js"),
+            require("./plugins/withAutoMetro.js"),
             [
                 "expo-router",
                 {

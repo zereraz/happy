@@ -288,6 +288,8 @@ export const SettingsSchema = z.object({
     favoriteDirectories: z.array(z.string()).describe('User-defined favorite directories for quick access in path selection'),
     // Favorite machines for quick machine selection
     favoriteMachines: z.array(z.string()).describe('User-defined favorite machines (machine IDs) for quick access in machine selection'),
+    // Fork-specific feature flags (isolated from upstream to minimize merge conflicts)
+    forkFlags: z.record(z.string(), z.boolean()).default({}).describe('Custom feature flags for our fork'),
     // Dismissed CLI warning banners (supports both per-machine and global dismissal)
     dismissedCLIWarnings: z.object({
         perMachine: z.record(z.string(), z.object({
@@ -354,6 +356,8 @@ export const settingsDefaults: Settings = {
     favoriteDirectories: ['~/src', '~/Desktop', '~/Documents'],
     // Favorite machines (empty by default)
     favoriteMachines: [],
+    // Fork feature flags (empty by default)
+    forkFlags: {},
     // Dismissed CLI warnings (empty by default)
     dismissedCLIWarnings: { perMachine: {}, global: {} },
 };
