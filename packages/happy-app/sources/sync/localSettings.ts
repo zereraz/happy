@@ -10,6 +10,7 @@ export const LocalSettingsSchema = z.object({
     devModeEnabled: z.boolean().describe('Enable developer menu in settings'),
     commandPaletteEnabled: z.boolean().describe('Enable CMD+K command palette (web only)'),
     themePreference: z.enum(['light', 'dark', 'adaptive']).describe('Theme preference: light, dark, or adaptive (follows system)'),
+    themeId: z.string().describe('Selected theme family ID (e.g. default, nord, dracula, solarized)'),
     markdownCopyV2: z.boolean().describe('Replace native paragraph selection with long-press modal for full markdown copy'),
     sidebarCollapsed: z.boolean().describe('Whether the sidebar is collapsed (web/desktop only)'),
     // CLI version acknowledgments - keyed by machineId
@@ -34,6 +35,7 @@ export const localSettingsDefaults: LocalSettings = {
     devModeEnabled: false,
     commandPaletteEnabled: false,
     themePreference: 'adaptive',
+    themeId: 'default',
     markdownCopyV2: false,
     sidebarCollapsed: false,
     acknowledgedCliVersions: {},

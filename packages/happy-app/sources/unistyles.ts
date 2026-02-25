@@ -1,6 +1,8 @@
 import { StyleSheet, UnistylesRuntime } from 'react-native-unistyles';
 import { darkTheme, lightTheme } from './theme';
-import { loadThemePreference } from './sync/persistence';
+import { loadThemePreference, loadThemeId } from './sync/persistence';
+import { getThemeFamily } from './themes';
+import type { Theme } from './theme';
 import { Appearance } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 
@@ -8,9 +10,14 @@ import * as SystemUI from 'expo-system-ui';
 // Theme
 //
 
+// Load selected theme family and build the theme pair
+const themeId = loadThemeId();
+const family = getThemeFamily(themeId);
+const isDefault = themeId === 'default';
+
 const appThemes = {
-    light: lightTheme,
-    dark: darkTheme
+    light: isDefault ? lightTheme : { ...lightTheme, colors: family.light } as Theme,
+    dark: isDefault ? darkTheme : { ...darkTheme, colors: family.dark } as Theme,
 };
 
 const breakpoints = {

@@ -90,6 +90,21 @@ export function loadThemePreference(): 'light' | 'dark' | 'adaptive' {
     return localSettingsDefaults.themePreference;
 }
 
+export function loadThemeId(): string {
+    const localSettings = mmkv.getString('local-settings');
+    if (localSettings) {
+        try {
+            const parsed = JSON.parse(localSettings);
+            const settings = localSettingsParse(parsed);
+            return settings.themeId;
+        } catch (e) {
+            console.error('Failed to parse local settings for theme id', e);
+            return localSettingsDefaults.themeId;
+        }
+    }
+    return localSettingsDefaults.themeId;
+}
+
 export function loadPurchases(): Purchases {
     const purchases = mmkv.getString('purchases');
     if (purchases) {

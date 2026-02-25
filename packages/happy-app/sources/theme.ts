@@ -28,6 +28,46 @@ const sharedSpacing = {
         large: 20,  // Action buttons (delete, duplicate, edit) - most common
         xlarge: 24, // Main section icons (desktop, folder)
     },
+
+    // Shadow elevation tiers (inspired by Cursor's 4-tier system)
+    elevation: {
+        sm: {
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowRadius: 4,
+            shadowOpacity: 0.08,
+            elevation: 2, // Android
+        },
+        base: {
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowRadius: 12,
+            shadowOpacity: 0.12,
+            elevation: 4,
+        },
+        lg: {
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 8 },
+            shadowRadius: 24,
+            shadowOpacity: 0.16,
+            elevation: 8,
+        },
+        xl: {
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 12 },
+            shadowRadius: 36,
+            shadowOpacity: 0.20,
+            elevation: 12,
+        },
+    },
+
+    // Animation timing tokens (from Cursor's timing system)
+    timing: {
+        fast: 100,    // Buttons, hover states
+        medium: 150,  // Color transitions, borders
+        layout: 200,  // Panel animations, transforms
+        modal: 160,   // Modal open/close
+    },
 } as const;
 
 export const lightTheme = {

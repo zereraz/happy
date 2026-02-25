@@ -10,6 +10,8 @@ import { Switch } from '@/components/Switch';
 import { Appearance } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { darkTheme, lightTheme } from '@/theme';
+import type { Theme } from '@/theme';
+import { themeRegistry, getThemeFamily } from '@/themes';
 import { t, getLanguageNativeName, SUPPORTED_LANGUAGES } from '@/text';
 
 // Define known avatar styles for this version of the app
@@ -32,18 +34,19 @@ export default function AppearanceSettingsScreen() {
     const [showFlavorIcons, setShowFlavorIcons] = useSettingMutable('showFlavorIcons');
     const [compactSessionView, setCompactSessionView] = useSettingMutable('compactSessionView');
     const [themePreference, setThemePreference] = useLocalSettingMutable('themePreference');
+    const [themeId, setThemeId] = useLocalSettingMutable('themeId');
     const [preferredLanguage] = useSettingMutable('preferredLanguage');
-    
+
     // Ensure we have a valid style for display, defaulting to gradient for unknown values
     const displayStyle: KnownAvatarStyle = isKnownAvatarStyle(avatarStyle) ? avatarStyle : 'gradient';
-    
+
     // Language display
     const getLanguageDisplayText = () => {
         if (preferredLanguage === null) {
             const deviceLocale = Localization.getLocales()?.[0]?.languageTag ?? 'en-US';
             const deviceLanguage = deviceLocale.split('-')[0].toLowerCase();
-            const detectedLanguageName = deviceLanguage in SUPPORTED_LANGUAGES ? 
-                                        getLanguageNativeName(deviceLanguage as keyof typeof SUPPORTED_LANGUAGES) : 
+            const detectedLanguageName = deviceLanguage in SUPPORTED_LANGUAGES ?
+                                        getLanguageNativeName(deviceLanguage as keyof typeof SUPPORTED_LANGUAGES) :
                                         getLanguageNativeName('en');
             return `${t('settingsLanguage.automatic')} (${detectedLanguageName})`;
         } else if (preferredLanguage && preferredLanguage in SUPPORTED_LANGUAGES) {
@@ -51,10 +54,29 @@ export default function AppearanceSettingsScreen() {
         }
         return t('settingsLanguage.automatic');
     };
+
+    // Apply a theme family at runtime
+    const applyThemeFamily = (newThemeId: string) => {
+        const family = getThemeFamily(newThemeId);
+        const isDefault = newThemeId === 'default';
+        const newLight = isDefault ? lightTheme : { ...lightTheme, colors: family.light } as Theme;
+        const newDark = isDefault ? darkTheme : { ...darkTheme, colors: family.dark } as Theme;
+
+        UnistylesRuntime.updateTheme('light', () => newLight);
+        UnistylesRuntime.updateTheme('dark', () => newDark);
+
+        const isDark = themePreference === 'adaptive'
+            ? Appearance.getColorScheme() === 'dark'
+            : themePreference === 'dark';
+        const color = isDark ? newDark.colors.groupped.background : newLight.colors.groupped.background;
+        UnistylesRuntime.setRootViewBackgroundColor(color);
+        SystemUI.setBackgroundColorAsync(color);
+    };
+
     return (
         <ItemList style={{ paddingTop: 0 }}>
 
-            {/* Theme Settings */}
+            {/* Theme Settings (fork: added theme family cycling) */}
             <ItemGroup title={t('settingsAppearance.theme')} footer={t('settingsAppearance.themeDescription')}>
                 <Item
                     title={t('settings.appearance')}
@@ -65,26 +87,39 @@ export default function AppearanceSettingsScreen() {
                         const currentIndex = themePreference === 'adaptive' ? 0 : themePreference === 'light' ? 1 : 2;
                         const nextIndex = (currentIndex + 1) % 3;
                         const nextTheme = nextIndex === 0 ? 'adaptive' : nextIndex === 1 ? 'light' : 'dark';
-                        
+
                         // Update the setting
                         setThemePreference(nextTheme);
-                        
+
                         // Apply the theme change immediately
+                        const family = getThemeFamily(themeId);
                         if (nextTheme === 'adaptive') {
-                            // Enable adaptive themes and set to system theme
                             UnistylesRuntime.setAdaptiveThemes(true);
                             const systemTheme = Appearance.getColorScheme();
-                            const color = systemTheme === 'dark' ? darkTheme.colors.groupped.background : lightTheme.colors.groupped.background;
+                            const color = systemTheme === 'dark' ? family.dark.groupped.background : family.light.groupped.background;
                             UnistylesRuntime.setRootViewBackgroundColor(color);
                             SystemUI.setBackgroundColorAsync(color);
                         } else {
-                            // Disable adaptive themes and set explicit theme
                             UnistylesRuntime.setAdaptiveThemes(false);
                             UnistylesRuntime.setTheme(nextTheme);
-                            const color = nextTheme === 'dark' ? darkTheme.colors.groupped.background : lightTheme.colors.groupped.background;
+                            const color = nextTheme === 'dark' ? family.dark.groupped.background : family.light.groupped.background;
                             UnistylesRuntime.setRootViewBackgroundColor(color);
                             SystemUI.setBackgroundColorAsync(color);
                         }
+                    }}
+                />
+                <Item
+                    title="Color Theme"
+                    subtitle="Cycle through available themes"
+                    icon={<Ionicons name="color-palette-outline" size={29} color={theme.colors.status.connecting} />}
+                    detail={getThemeFamily(themeId).name}
+                    onPress={() => {
+                        const ids = themeRegistry.map(t => t.id);
+                        const currentIdx = ids.indexOf(themeId);
+                        const nextIdx = (currentIdx + 1) % ids.length;
+                        const nextId = ids[nextIdx];
+                        setThemeId(nextId);
+                        applyThemeFamily(nextId);
                     }}
                 />
             </ItemGroup>
