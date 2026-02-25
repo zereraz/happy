@@ -147,6 +147,8 @@ export const pl: TranslationStructure = {
         usageSubtitle: 'Zobacz użycie API i koszty',
         profiles: 'Profile',
         profilesSubtitle: 'Zarządzaj profilami zmiennych środowiskowych dla sesji',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `Konto ${service} połączone`,
@@ -219,6 +221,14 @@ export const pl: TranslationStructure = {
         enhancedSessionWizard: 'Ulepszony kreator sesji',
         enhancedSessionWizardEnabled: 'Aktywny launcher z profilem',
         enhancedSessionWizardDisabled: 'Używanie standardowego launchera sesji',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {

@@ -102,6 +102,7 @@ export interface Session {
         contextSize: number;
         timestamp: number;
     } | null;
+    lastMessageAt?: number; // Computed client-side: max createdAt from received messages
 }
 
 export interface DecryptedMessage {

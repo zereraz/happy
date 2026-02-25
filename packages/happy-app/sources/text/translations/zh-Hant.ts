@@ -137,6 +137,8 @@ export const zhHant: TranslationStructure = {
         usageSubtitle: '查看 API 使用情況和費用',
         profiles: '設定檔',
         profilesSubtitle: '管理工作階段的環境變數設定檔',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `已連結 ${service} 帳戶`,
@@ -209,6 +211,14 @@ export const zhHant: TranslationStructure = {
         enhancedSessionWizard: '增強工作階段精靈',
         enhancedSessionWizardEnabled: '設定檔優先的工作階段啟動器已啟用',
         enhancedSessionWizardDisabled: '使用標準工作階段啟動器',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {

@@ -138,6 +138,8 @@ export const zhHans: TranslationStructure = {
         usageSubtitle: '查看 API 使用情况和费用',
         profiles: '配置文件',
         profilesSubtitle: '管理环境配置文件和变量',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `已连接 ${service} 账户`,
@@ -210,6 +212,14 @@ export const zhHans: TranslationStructure = {
         enhancedSessionWizard: '增强会话向导',
         enhancedSessionWizardEnabled: '配置文件优先启动器已激活',
         enhancedSessionWizardDisabled: '使用标准会话启动器',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {

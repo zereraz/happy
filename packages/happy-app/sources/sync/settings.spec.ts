@@ -122,6 +122,7 @@ describe('settings', () => {
                 lastUsedProfile: null,
                 favoriteDirectories: [],
                 favoriteMachines: [],
+                forkFlags: {},
                 dismissedCLIWarnings: { perMachine: {}, global: {} },
             };
             const delta: Partial<Settings> = {
@@ -156,6 +157,7 @@ describe('settings', () => {
                 lastUsedProfile: null,
                 favoriteDirectories: [],
                 favoriteMachines: [],
+                forkFlags: {},
                 dismissedCLIWarnings: { perMachine: {}, global: {} },
             });
         });
@@ -190,6 +192,7 @@ describe('settings', () => {
                 lastUsedProfile: null,
                 favoriteDirectories: [],
                 favoriteMachines: [],
+                forkFlags: {},
                 dismissedCLIWarnings: { perMachine: {}, global: {} },
             };
             const delta: Partial<Settings> = {};
@@ -226,6 +229,7 @@ describe('settings', () => {
                 lastUsedProfile: null,
                 favoriteDirectories: [],
                 favoriteMachines: [],
+                forkFlags: {},
                 dismissedCLIWarnings: { perMachine: {}, global: {} },
             };
             const delta: Partial<Settings> = {
@@ -267,6 +271,7 @@ describe('settings', () => {
                 lastUsedProfile: null,
                 favoriteDirectories: [],
                 favoriteMachines: [],
+                forkFlags: {},
                 dismissedCLIWarnings: { perMachine: {}, global: {} },
             };
             expect(applySettings(currentSettings, {})).toEqual(currentSettings);
@@ -317,6 +322,7 @@ describe('settings', () => {
                 lastUsedProfile: null,
                 favoriteDirectories: [],
                 favoriteMachines: [],
+                forkFlags: {},
                 dismissedCLIWarnings: { perMachine: {}, global: {} },
             };
             const delta: any = {
@@ -378,6 +384,7 @@ describe('settings', () => {
                 lastUsedProfile: null,
                 favoriteDirectories: ['~/src', '~/Desktop', '~/Documents'],
                 favoriteMachines: [],
+                forkFlags: {},
                 dismissedCLIWarnings: { perMachine: {}, global: {} },
                 useEnhancedSessionWizard: false,
             });

@@ -12,7 +12,7 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
             return data;
         }
 
-        // Fork: custom sidebar — flat list sorted by recency, no grouping
+        // Fork: custom sidebar — flat list, active first then by activeAt
         if (customSidebar) {
             const allSessions: Session[] = [];
             for (const item of data) {
@@ -24,7 +24,14 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
                     }
                 }
             }
-            allSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+            allSessions.sort((a, b) => {
+                // 1. Streaming (thinking) sessions at the very top
+                if (a.thinking !== b.thinking) return a.thinking ? -1 : 1;
+                // 2. By last user message time, fallback to createdAt (stable)
+                const aTime = a.lastMessageAt ?? a.createdAt;
+                const bTime = b.lastMessageAt ?? b.createdAt;
+                return bTime - aTime;
+            });
             return allSessions.map(session => ({ type: 'session' as const, session }));
         }
 

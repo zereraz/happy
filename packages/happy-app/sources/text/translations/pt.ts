@@ -136,6 +136,8 @@ export const pt: TranslationStructure = {
         usageSubtitle: 'Visualizar uso da API e custos',
         profiles: 'Perfis',
         profilesSubtitle: 'Gerenciar perfis de ambiente e variáveis',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `Conta ${service} conectada`,
@@ -208,6 +210,14 @@ export const pt: TranslationStructure = {
         enhancedSessionWizard: 'Assistente de sessão aprimorado',
         enhancedSessionWizardEnabled: 'Lançador de sessão com perfil ativo',
         enhancedSessionWizardDisabled: 'Usando o lançador de sessão padrão',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {

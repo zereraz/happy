@@ -520,13 +520,23 @@ export const storage = create<StorageState>()((set, get) => {
                 const messagesArray = Object.values(mergedMessagesMap)
                     .sort((a, b) => b.createdAt - a.createdAt);
 
-                // Update session with todos and latestUsage
+                // Last user message timestamp: find the latest user message in the batch
+                let lastMessageAt = 0;
+                for (let i = normalizedMessages.length - 1; i >= 0; i--) {
+                    if (normalizedMessages[i].role === 'user') {
+                        lastMessageAt = normalizedMessages[i].createdAt;
+                        break;
+                    }
+                }
+
+                // Update session with todos, latestUsage, and lastMessageAt
                 // IMPORTANT: We extract latestUsage from the mutable reducerState and copy it to the Session object
                 // This ensures latestUsage is available immediately on load, even before messages are fully loaded
                 let updatedSessions = state.sessions;
-                const needsUpdate = (reducerResult.todos !== undefined || existingSession.reducerState.latestUsage) && session;
+                const hasNewMessageAt = lastMessageAt > 0 && session && lastMessageAt > (session.lastMessageAt ?? 0);
+                const needsUpdate = ((reducerResult.todos !== undefined || existingSession.reducerState.latestUsage) && session) || hasNewMessageAt;
 
-                if (needsUpdate) {
+                if (needsUpdate && session) {
                     updatedSessions = {
                         ...state.sessions,
                         [sessionId]: {
@@ -535,7 +545,9 @@ export const storage = create<StorageState>()((set, get) => {
                             // Copy latestUsage from reducerState to make it immediately available
                             latestUsage: existingSession.reducerState.latestUsage ? {
                                 ...existingSession.reducerState.latestUsage
-                            } : session.latestUsage
+                            } : session.latestUsage,
+                            // Track last real message timestamp for sidebar sorting
+                            ...(hasNewMessageAt && { lastMessageAt }),
                         }
                     };
                 }

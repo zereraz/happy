@@ -6,16 +6,6 @@ import { useSettingMutable } from '@/sync/storage';
 import { Switch } from '@/components/Switch';
 import { t } from '@/text';
 
-// Define all fork-specific feature flags here.
-// Adding a new flag is just one entry in this array — no schema changes needed.
-const FORK_FLAGS = [
-    {
-        key: 'customSidebar',
-        icon: 'grid-outline' as const,
-        color: '#FF6347',
-    },
-] as const;
-
 export default function ForkSettingsScreen() {
     const [forkFlags, setForkFlags] = useSettingMutable('forkFlags');
 
@@ -23,31 +13,29 @@ export default function ForkSettingsScreen() {
         setForkFlags({ ...forkFlags, [key]: !(forkFlags[key] ?? false) });
     };
 
+    const customSidebar = forkFlags['customSidebar'] ?? false;
+
     return (
         <ItemList style={{ paddingTop: 0 }}>
             <ItemGroup
                 title={t('settingsFork.sidebar')}
                 footer={t('settingsFork.sidebarDescription')}
             >
-                {FORK_FLAGS.map((flag) => (
-                    <Item
-                        key={flag.key}
-                        title={t(`settingsFork.${flag.key}` as any)}
-                        subtitle={
-                            (forkFlags[flag.key] ?? false)
-                                ? t(`settingsFork.${flag.key}Enabled` as any)
-                                : t(`settingsFork.${flag.key}Disabled` as any)
-                        }
-                        icon={<Ionicons name={flag.icon} size={29} color={flag.color} />}
-                        rightElement={
-                            <Switch
-                                value={forkFlags[flag.key] ?? false}
-                                onValueChange={() => toggleFlag(flag.key)}
-                            />
-                        }
-                        showChevron={false}
-                    />
-                ))}
+                <Item
+                    title={t('settingsFork.customSidebar')}
+                    subtitle={customSidebar
+                        ? t('settingsFork.customSidebarEnabled')
+                        : t('settingsFork.customSidebarDisabled')
+                    }
+                    icon={<Ionicons name="grid-outline" size={29} color="#FF6347" />}
+                    rightElement={
+                        <Switch
+                            value={customSidebar}
+                            onValueChange={() => toggleFlag('customSidebar')}
+                        />
+                    }
+                    showChevron={false}
+                />
             </ItemGroup>
         </ItemList>
     );

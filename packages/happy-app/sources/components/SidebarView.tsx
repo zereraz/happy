@@ -1,6 +1,6 @@
 import { useSocketStatus, useFriendRequests, useSettings } from '@/sync/storage';
 import * as React from 'react';
-import { Text, View, Pressable, useWindowDimensions } from 'react-native';
+import { Text, View, Pressable, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useHeaderHeight } from '@/utils/responsive';
@@ -129,7 +129,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     },
 }));
 
-export const SidebarView = React.memo(() => {
+export const SidebarView = React.memo(({ onCollapse }: { onCollapse?: () => void }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const safeArea = useSafeAreaInsets();
@@ -219,6 +219,12 @@ export const SidebarView = React.memo(() => {
         <>
             <View style={[styles.container, { paddingTop: safeArea.top }]}>
                 <View style={[styles.header, { height: headerHeight }]}>
+                    {/* Collapse sidebar button (web/desktop only) */}
+                    {Platform.OS === 'web' && onCollapse && (
+                        <Pressable onPress={onCollapse} hitSlop={10} style={{ marginRight: 4 }}>
+                            <Ionicons name="chevron-back-outline" size={20} color={theme.colors.header.tint} />
+                        </Pressable>
+                    )}
                     {/* Logo - always first */}
                     <View style={styles.logoContainer}>
                         <Image

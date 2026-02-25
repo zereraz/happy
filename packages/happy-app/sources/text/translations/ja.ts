@@ -168,6 +168,8 @@ export const ja: TranslationStructure = {
         usageSubtitle: 'API使用量とコストを確認',
         profiles: 'プロファイル',
         profilesSubtitle: 'セッション用の環境変数プロファイルを管理',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `${service}アカウントが接続されました`,
@@ -240,6 +242,14 @@ export const ja: TranslationStructure = {
         enhancedSessionWizard: '拡張セッションウィザード',
         enhancedSessionWizardEnabled: 'プロファイル優先セッションランチャーが有効',
         enhancedSessionWizardDisabled: '標準セッションランチャーを使用',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {

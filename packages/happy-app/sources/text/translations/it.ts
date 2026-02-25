@@ -165,6 +165,8 @@ export const it: TranslationStructure = {
         usageSubtitle: 'Vedi il tuo utilizzo API e i costi',
         profiles: 'Profili',
         profilesSubtitle: 'Gestisci i profili delle variabili ambiente per le sessioni',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `Account ${service} collegato`,
@@ -237,6 +239,14 @@ export const it: TranslationStructure = {
         enhancedSessionWizard: 'Wizard sessione avanzato',
         enhancedSessionWizardEnabled: 'Avvio sessioni con profili attivo',
         enhancedSessionWizardDisabled: 'Usando avvio sessioni standard',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {

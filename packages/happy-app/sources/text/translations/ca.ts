@@ -136,6 +136,8 @@ export const ca: TranslationStructure = {
         usageSubtitle: "Veure l'ús de l'API i costos",
         profiles: 'Perfils',
         profilesSubtitle: 'Gestiona els perfils d\'entorn i variables',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `Compte de ${service} connectat`,
@@ -208,6 +210,14 @@ export const ca: TranslationStructure = {
         enhancedSessionWizard: 'Assistent de sessió millorat',
         enhancedSessionWizardEnabled: 'Llançador de sessió amb perfil actiu',
         enhancedSessionWizardDisabled: 'Usant el llançador de sessió estàndard',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {

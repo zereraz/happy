@@ -118,6 +118,8 @@ export const ru: TranslationStructure = {
         usageSubtitle: 'Просмотр использования API и затрат',
         profiles: 'Профили',
         profilesSubtitle: 'Управление профилями переменных окружения для сессий',
+        forkFlags: 'Fork Flags',
+        forkFlagsSubtitle: 'Custom feature flags for our fork',
 
         // Dynamic settings messages
         accountConnected: ({ service }: { service: string }) => `Аккаунт ${service} подключен`,
@@ -190,6 +192,14 @@ export const ru: TranslationStructure = {
         enhancedSessionWizard: 'Улучшенный мастер сессий',
         enhancedSessionWizardEnabled: 'Лаунчер с профилем активен',
         enhancedSessionWizardDisabled: 'Используется стандартный лаунчер',
+    },
+
+    settingsFork: {
+        sidebar: 'Sidebar',
+        sidebarDescription: 'Customize how sessions are displayed in the sidebar.',
+        customSidebar: 'Custom Sidebar',
+        customSidebarEnabled: 'Sessions grouped by recent activity',
+        customSidebarDisabled: 'Using default sidebar layout',
     },
 
     errors: {
