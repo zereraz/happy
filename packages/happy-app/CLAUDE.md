@@ -74,6 +74,29 @@ This generates `sources/changelog/changelog.json` which is used by the app.
 - Removed deprecated API endpoints
 ```
 
+## Fork Maintenance (HIGH PRIORITY)
+
+This is a fork (`sahebjot/dev` branch) of the upstream Happy app. We maintain a small set of isolated changes on top of upstream. **When making any fork-specific change, you MUST update `docs/fork-changes.md`.**
+
+### Rules
+- **Always update `docs/fork-changes.md`** after adding, modifying, or removing any fork-specific feature. Include what changed, which files, and why.
+- **Keep fork changes minimal** — we merge upstream regularly. The fewer lines we diverge, the fewer conflicts.
+- **Isolate fork code** — use `useForkFlag('flagName')` to gate fork-specific behavior. This keeps upstream code paths untouched.
+- **One schema field for all flags** — `forkFlags` in `SettingsSchema` is a single `z.record(string, boolean)`. New flags are added in the UI page (`settings/fork.tsx`) only, no schema changes needed.
+- **Device-local settings** go in `localSettings.ts` (not synced). Synced fork settings go through `forkFlags`.
+
+### Current fork features (see `docs/fork-changes.md` for details)
+- **Fork Settings** — dedicated settings page with feature flag toggles
+- **Custom Sidebar** (flag: `customSidebar`) — flat session list sorted by last user message, streaming sessions on top, with group support
+- **Collapsible Sidebar** — web/desktop only, collapse/expand drawer
+- **Session Groups** — user-defined groups with CRUD, sessions assigned via group picker
+- **`lastMessageAt` tracking** — client-side computed from user messages in `applyMessages`, used for stable sidebar sorting
+
+### What NOT to do
+- Don't modify upstream sort logic in `buildSessionListViewData` — override in `useVisibleSessionListViewData` instead
+- Don't use `updatedAt` or `activeAt` for sidebar sorting — they're noisy (see doc for why)
+- Don't add fork flags to `SettingsSchema` as individual fields — use the `forkFlags` record
+
 ## Architecture Overview
 
 ### Core Technology Stack
