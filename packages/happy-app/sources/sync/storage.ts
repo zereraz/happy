@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useShallow } from 'zustand/react/shallow'
-import { Session, Machine, GitStatus } from "./storageTypes";
+import { Session, Machine, GitStatus, Group } from "./storageTypes";
 import { createReducer, reducer, ReducerState } from "./reducer/reducer";
 import { Message } from "./typesMessage";
 import { NormalizedMessage } from "./typesRaw";
@@ -64,6 +64,7 @@ export type SessionListViewItem =
     | { type: 'header'; title: string }
     | { type: 'active-sessions'; sessions: Session[] }
     | { type: 'project-group'; displayPath: string; machine: Machine }
+    | { type: 'group-header'; group: Group }
     | { type: 'session'; session: Session; variant?: 'default' | 'no-path' };
 
 // Legacy type for backward compatibility - to be removed
@@ -81,6 +82,7 @@ interface StorageState {
     sessionMessages: Record<string, SessionMessages>;
     sessionGitStatus: Record<string, GitStatus | null>;
     machines: Record<string, Machine>;
+    groups: Record<string, Group>;
     artifacts: Record<string, DecryptedArtifact>;  // New artifacts storage
     friends: Record<string, UserProfile>;  // All relationships (friends, pending, requested, etc.)
     users: Record<string, UserProfile | null>;  // Global user cache, null = 404/failed fetch
@@ -125,6 +127,11 @@ interface StorageState {
     updateArtifact: (artifact: DecryptedArtifact) => void;
     deleteArtifact: (artifactId: string) => void;
     deleteSession: (sessionId: string) => void;
+    // Group management methods
+    applyGroups: (groups: Group[]) => void;
+    deleteGroup: (groupId: string) => void;
+    updateGroup: (groupId: string, updates: Partial<Pick<Group, 'name' | 'sortOrder'>>) => void;
+    updateSessionGroup: (sessionId: string, groupId: string | null) => void;
     // Project management methods
     getProjects: () => import('./projectManager').Project[];
     getProject: (projectId: string) => import('./projectManager').Project | null;
@@ -259,6 +266,7 @@ export const storage = create<StorageState>()((set, get) => {
         profile,
         sessions: {},
         machines: {},
+        groups: {},
         artifacts: {},  // Initialize artifacts
         friends: {},  // Initialize relationships cache
         users: {},  // Initialize global user cache
@@ -954,6 +962,46 @@ export const storage = create<StorageState>()((set, get) => {
                 sessionListViewData
             };
         }),
+        // Group management methods
+        applyGroups: (groups: Group[]) => set((state) => {
+            const merged = { ...state.groups };
+            groups.forEach(g => { merged[g.id] = g; });
+            return { ...state, groups: merged };
+        }),
+        deleteGroup: (groupId: string) => set((state) => {
+            const { [groupId]: _, ...remaining } = state.groups;
+            // Nullify groupId on sessions that belonged to this group
+            const sessions = { ...state.sessions };
+            for (const [id, session] of Object.entries(sessions)) {
+                if (session.groupId === groupId) {
+                    sessions[id] = { ...session, groupId: null };
+                }
+            }
+            return {
+                ...state,
+                groups: remaining,
+                sessions,
+                sessionListViewData: buildSessionListViewData(sessions),
+            };
+        }),
+        updateGroup: (groupId: string, updates: Partial<Pick<Group, 'name' | 'sortOrder'>>) => set((state) => {
+            const group = state.groups[groupId];
+            if (!group) return state;
+            return {
+                ...state,
+                groups: { ...state.groups, [groupId]: { ...group, ...updates, updatedAt: Date.now() } },
+            };
+        }),
+        updateSessionGroup: (sessionId: string, groupId: string | null) => set((state) => {
+            const session = state.sessions[sessionId];
+            if (!session) return state;
+            const sessions = { ...state.sessions, [sessionId]: { ...session, groupId } };
+            return {
+                ...state,
+                sessions,
+                sessionListViewData: buildSessionListViewData(sessions),
+            };
+        }),
         // Friend management methods
         applyFriends: (friends: UserProfile[]) => set((state) => {
             const mergedFriends = { ...state.friends };
@@ -1166,6 +1214,17 @@ export function useLocalSettingMutable<K extends keyof LocalSettings>(name: K): 
     }, [name]);
     const value = useLocalSetting(name);
     return [value, setValue];
+}
+
+// Group hooks
+export function useGroups(): Group[] {
+    return storage(useShallow((state) => {
+        return Object.values(state.groups).sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt);
+    }));
+}
+
+export function useGroup(id: string | null | undefined): Group | null {
+    return storage((state) => id ? state.groups[id] ?? null : null);
 }
 
 // Project management hooks

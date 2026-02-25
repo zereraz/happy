@@ -7,11 +7,11 @@ import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
 import { Avatar } from '@/components/Avatar';
-import { useSession, useIsDataReady } from '@/sync/storage';
+import { useSession, useIsDataReady, useGroups, useGroup } from '@/sync/storage';
 import { getSessionName, useSessionStatus, formatOSPlatform, formatPathRelativeToHome, getSessionAvatarId } from '@/utils/sessionUtils';
 import * as Clipboard from 'expo-clipboard';
 import { Modal } from '@/modal';
-import { sessionKill, sessionDelete } from '@/sync/ops';
+import { sessionKill, sessionDelete, sessionSetGroup, groupCreate } from '@/sync/ops';
 import { useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
@@ -126,6 +126,8 @@ function SessionInfoContent({ session }: { session: Session }) {
     const devModeEnabled = __DEV__;
     const sessionName = getSessionName(session);
     const sessionStatus = useSessionStatus(session);
+    const groups = useGroups();
+    const currentGroup = useGroup(session.groupId);
     
     // Check if CLI version is outdated
     const isCliOutdated = session.metadata?.version && !isVersionSupported(session.metadata.version, MINIMUM_CLI_VERSION);
@@ -213,6 +215,44 @@ function SessionInfoContent({ session }: { session: Session }) {
             Modal.alert(t('common.error'), t('common.error'));
         }
     }, []);
+
+    const handleGroupPicker = useCallback(() => {
+        const options: Array<{ text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }> = [];
+
+        // "None" option to unassign
+        if (session.groupId) {
+            options.push({
+                text: 'None',
+                onPress: () => sessionSetGroup(session.id, null),
+            });
+        }
+
+        // Existing groups
+        for (const group of groups) {
+            if (group.id === session.groupId) continue; // Skip current
+            options.push({
+                text: group.name,
+                onPress: () => sessionSetGroup(session.id, group.id),
+            });
+        }
+
+        // "New Group..." option
+        options.push({
+            text: 'New Group...',
+            onPress: async () => {
+                const name = await Modal.prompt('New Group', 'Enter group name', { placeholder: 'Group name' });
+                if (!name || !name.trim()) return;
+                const result = await groupCreate(name.trim());
+                if (result.success && result.groupId) {
+                    await sessionSetGroup(session.id, result.groupId);
+                }
+            },
+        });
+
+        options.push({ text: t('common.cancel'), style: 'cancel' });
+
+        Modal.alert('Group', 'Assign this session to a group', options);
+    }, [session.id, session.groupId, groups]);
 
     return (
         <>
@@ -309,6 +349,12 @@ function SessionInfoContent({ session }: { session: Session }) {
 
                 {/* Quick Actions */}
                 <ItemGroup title={t('sessionInfo.quickActions')}>
+                    <Item
+                        title="Group"
+                        subtitle={currentGroup ? currentGroup.name : 'None'}
+                        icon={<Ionicons name="folder-outline" size={29} color="#5AC8FA" />}
+                        onPress={handleGroupPicker}
+                    />
                     {session.metadata?.machineId && (
                         <Item
                             title={t('sessionInfo.viewMachine')}

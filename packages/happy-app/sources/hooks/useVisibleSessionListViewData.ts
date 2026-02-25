@@ -1,19 +1,32 @@
 import * as React from 'react';
-import { SessionListViewItem, useSessionListViewData, useSetting, useForkFlag } from '@/sync/storage';
+import { SessionListViewItem, useSessionListViewData, useSetting, useForkFlag, useGroups } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
+
+function sortSessions(sessions: Session[]): Session[] {
+    return sessions.sort((a, b) => {
+        // 1. Streaming (thinking) sessions at the very top
+        if (a.thinking !== b.thinking) return a.thinking ? -1 : 1;
+        // 2. By last user message time, fallback to createdAt (stable)
+        const aTime = a.lastMessageAt ?? a.createdAt;
+        const bTime = b.lastMessageAt ?? b.createdAt;
+        return bTime - aTime;
+    });
+}
 
 export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
     const data = useSessionListViewData();
     const hideInactiveSessions = useSetting('hideInactiveSessions');
     const customSidebar = useForkFlag('customSidebar');
+    const groups = useGroups();
 
     return React.useMemo(() => {
         if (!data) {
             return data;
         }
 
-        // Fork: custom sidebar — flat list, active first then by activeAt
+        // Fork: custom sidebar — groups first, then ungrouped sessions
         if (customSidebar) {
+            // Collect all sessions from the list view data
             const allSessions: Session[] = [];
             for (const item of data) {
                 if (item.type === 'active-sessions') {
@@ -24,15 +37,49 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
                     }
                 }
             }
-            allSessions.sort((a, b) => {
-                // 1. Streaming (thinking) sessions at the very top
-                if (a.thinking !== b.thinking) return a.thinking ? -1 : 1;
-                // 2. By last user message time, fallback to createdAt (stable)
-                const aTime = a.lastMessageAt ?? a.createdAt;
-                const bTime = b.lastMessageAt ?? b.createdAt;
-                return bTime - aTime;
-            });
-            return allSessions.map(session => ({ type: 'session' as const, session }));
+
+            // Dedupe by id (active-sessions may overlap with session items)
+            const seen = new Set<string>();
+            const uniqueSessions: Session[] = [];
+            for (const s of allSessions) {
+                if (!seen.has(s.id)) {
+                    seen.add(s.id);
+                    uniqueSessions.push(s);
+                }
+            }
+
+            // Partition sessions by group
+            const grouped = new Map<string, Session[]>();
+            const ungrouped: Session[] = [];
+
+            for (const session of uniqueSessions) {
+                if (session.groupId && groups.some(g => g.id === session.groupId)) {
+                    const list = grouped.get(session.groupId) || [];
+                    list.push(session);
+                    grouped.set(session.groupId, list);
+                } else {
+                    ungrouped.push(session);
+                }
+            }
+
+            const result: SessionListViewItem[] = [];
+
+            // Groups first, sorted by sortOrder
+            for (const group of groups) {
+                const sessions = grouped.get(group.id);
+                if (!sessions || sessions.length === 0) continue;
+                result.push({ type: 'group-header', group });
+                for (const session of sortSessions(sessions)) {
+                    result.push({ type: 'session', session, variant: 'no-path' });
+                }
+            }
+
+            // Ungrouped sessions after
+            for (const session of sortSessions(ungrouped)) {
+                result.push({ type: 'session', session });
+            }
+
+            return result;
         }
 
         if (!hideInactiveSessions) {
@@ -67,5 +114,5 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
         }
 
         return filtered;
-    }, [data, hideInactiveSessions, customSidebar]);
+    }, [data, hideInactiveSessions, customSidebar, groups]);
 }

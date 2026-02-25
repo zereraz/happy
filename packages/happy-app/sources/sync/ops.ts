@@ -520,6 +520,76 @@ export async function sessionDelete(sessionId: string): Promise<{ success: boole
     }
 }
 
+// Group operations
+
+export async function groupCreate(name: string, sortOrder?: number): Promise<{ success: boolean; groupId?: string; message?: string }> {
+    try {
+        const response = await apiSocket.request('/v1/groups', {
+            method: 'POST',
+            body: JSON.stringify({ name, sortOrder }),
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return { success: true, groupId: data.group.id };
+        } else {
+            const error = await response.text();
+            return { success: false, message: error || 'Failed to create group' };
+        }
+    } catch (error) {
+        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
+export async function groupUpdate(groupId: string, updates: { name?: string; sortOrder?: number }): Promise<{ success: boolean; message?: string }> {
+    try {
+        const response = await apiSocket.request(`/v1/groups/${groupId}`, {
+            method: 'POST',
+            body: JSON.stringify(updates),
+        });
+        if (response.ok) {
+            return { success: true };
+        } else {
+            const error = await response.text();
+            return { success: false, message: error || 'Failed to update group' };
+        }
+    } catch (error) {
+        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
+export async function groupDelete(groupId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+        const response = await apiSocket.request(`/v1/groups/${groupId}`, {
+            method: 'DELETE',
+        });
+        if (response.ok) {
+            return { success: true };
+        } else {
+            const error = await response.text();
+            return { success: false, message: error || 'Failed to delete group' };
+        }
+    } catch (error) {
+        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
+export async function sessionSetGroup(sessionId: string, groupId: string | null): Promise<{ success: boolean; message?: string }> {
+    try {
+        const response = await apiSocket.request(`/v1/sessions/${sessionId}/group`, {
+            method: 'POST',
+            body: JSON.stringify({ groupId }),
+        });
+        if (response.ok) {
+            return { success: true };
+        } else {
+            const error = await response.text();
+            return { success: false, message: error || 'Failed to update session group' };
+        }
+    } catch (error) {
+        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
 // Export types for external use
 export type {
     SessionBashRequest,

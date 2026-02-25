@@ -68,6 +68,15 @@ export const AgentStateSchema = z.object({
 
 export type AgentState = z.infer<typeof AgentStateSchema>;
 
+export interface Group {
+    id: string;
+    name: string;
+    sortOrder: number;
+    seq: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
 export interface Session {
     id: string,
     seq: number,
@@ -75,6 +84,7 @@ export interface Session {
     updatedAt: number,
     active: boolean,
     activeAt: number,
+    groupId: string | null,
     metadata: Metadata | null,
     metadataVersion: number,
     agentState: AgentState | null,

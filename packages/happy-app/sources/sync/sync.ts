@@ -99,6 +99,7 @@ class Sync {
     private friendsSync: InvalidateSync;
     private friendRequestsSync: InvalidateSync;
     private feedSync: InvalidateSync;
+    private groupsSync: InvalidateSync;
     private activityAccumulator: ActivityUpdateAccumulator;
     private pendingSettings: Partial<Settings> = loadPendingSettings();
     private appState: AppStateStatus = AppState.currentState;
@@ -122,6 +123,7 @@ class Sync {
         this.friendsSync = new InvalidateSync(this.fetchFriends);
         this.friendRequestsSync = new InvalidateSync(this.fetchFriendRequests);
         this.feedSync = new InvalidateSync(this.fetchFeed);
+        this.groupsSync = new InvalidateSync(this.fetchGroups);
 
         const registerPushToken = async () => {
             if (__DEV__) {
@@ -219,7 +221,8 @@ class Sync {
         this.friendRequestsSync.invalidate();
         this.artifactsSync.invalidate();
         this.feedSync.invalidate();
-        log.log('🔄 #init: All syncs invalidated, including artifacts');
+        this.groupsSync.invalidate();
+        log.log('🔄 #init: All syncs invalidated, including artifacts and groups');
 
         // Wait for both sessions and machines to load, then mark as ready
         Promise.all([
@@ -740,6 +743,7 @@ class Sync {
             metadataVersion: number;
             agentState: string | null;
             agentStateVersion: number;
+            groupId: string | null;
             dataEncryptionKey: string | null;
             active: boolean;
             activeAt: number;
@@ -796,6 +800,33 @@ class Sync {
         this.applySessions(decryptedSessions);
         log.log(`📥 fetchSessions completed - processed ${decryptedSessions.length} sessions`);
 
+    }
+
+    private fetchGroups = async () => {
+        if (!this.credentials) return;
+        const API_ENDPOINT = getServerUrl();
+        const response = await fetch(`${API_ENDPOINT}/v1/groups`, {
+            headers: {
+                'Authorization': `Bearer ${this.credentials.token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            // Groups endpoint may not exist on older servers — silently ignore
+            if (response.status === 404) return;
+            throw new Error(`Failed to fetch groups: ${response.status}`);
+        }
+        const data = await response.json();
+        const groups = data.groups as Array<{
+            id: string;
+            name: string;
+            sortOrder: number;
+            seq: number;
+            createdAt: number;
+            updatedAt: number;
+        }>;
+        storage.getState().applyGroups(groups);
+        log.log(`📁 fetchGroups completed - processed ${groups.length} groups`);
     }
 
     public refreshMachines = async () => {
@@ -2185,6 +2216,31 @@ class Sync {
             
             // Apply to storage (will handle repeatKey replacement)
             storage.getState().applyFeedItems([feedItem]);
+        } else if (updateData.body.t === 'new-group') {
+            log.log('📁 Received new-group update');
+            const g = updateData.body;
+            storage.getState().applyGroups([{
+                id: g.groupId,
+                name: g.name,
+                sortOrder: g.sortOrder,
+                seq: g.seq,
+                createdAt: g.createdAt,
+                updatedAt: g.updatedAt,
+            }]);
+        } else if (updateData.body.t === 'update-group') {
+            log.log('📁 Received update-group update');
+            const g = updateData.body;
+            storage.getState().updateGroup(g.groupId, {
+                ...(g.name !== undefined ? { name: g.name } : {}),
+                ...(g.sortOrder !== undefined ? { sortOrder: g.sortOrder } : {}),
+            });
+        } else if (updateData.body.t === 'delete-group') {
+            log.log('📁 Received delete-group update');
+            storage.getState().deleteGroup(updateData.body.groupId);
+        } else if (updateData.body.t === 'update-session-group') {
+            log.log('📁 Received update-session-group update');
+            const { sessionId, groupId } = updateData.body;
+            storage.getState().updateSessionGroup(sessionId, groupId);
         }
     }
 

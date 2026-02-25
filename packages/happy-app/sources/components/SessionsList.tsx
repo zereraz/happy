@@ -232,6 +232,7 @@ export function SessionsList() {
             case 'header': return `header-${item.title}-${index}`;
             case 'active-sessions': return 'active-sessions';
             case 'project-group': return `project-group-${item.machine.id}-${item.displayPath}-${index}`;
+            case 'group-header': return `group-${item.group.id}`;
             case 'session': return `session-${item.session.id}`;
         }
     }, []);
@@ -275,14 +276,23 @@ export function SessionsList() {
                     </View>
                 );
 
+            case 'group-header':
+                return (
+                    <View style={styles.headerSection}>
+                        <Text style={styles.headerText}>
+                            {item.group.name}
+                        </Text>
+                    </View>
+                );
+
             case 'session':
                 // Determine card styling based on position within date group
                 const prevItem = index > 0 && dataWithSelected ? dataWithSelected[index - 1] : null;
                 const nextItem = index < (dataWithSelected?.length || 0) - 1 && dataWithSelected ? dataWithSelected[index + 1] : null;
 
                 // Custom sidebar: every session is a standalone card
-                const isFirst = customSidebar ? true : prevItem?.type === 'header';
-                const isLast = customSidebar ? true : (nextItem?.type === 'header' || nextItem == null || nextItem?.type === 'active-sessions');
+                const isFirst = customSidebar ? true : (prevItem?.type === 'header' || prevItem?.type === 'group-header');
+                const isLast = customSidebar ? true : (nextItem?.type === 'header' || nextItem?.type === 'group-header' || nextItem == null || nextItem?.type === 'active-sessions');
                 const isSingle = isFirst && isLast;
 
                 return (

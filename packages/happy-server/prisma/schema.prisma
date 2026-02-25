@@ -39,6 +39,7 @@ model Account {
     avatar    Json?
 
     Session             Session[]
+    Group               Group[]
     AccountPushToken    AccountPushToken[]
     TerminalAuthRequest TerminalAuthRequest[]
     AccountAuthRequest  AccountAuthRequest[]
@@ -95,6 +96,8 @@ model Session {
     tag               String
     accountId         String
     account           Account          @relation(fields: [accountId], references: [id])
+    groupId           String?
+    group             Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
     metadata          String
     metadataVersion   Int              @default(0)
     agentState        String?
@@ -110,6 +113,26 @@ model Session {
     accessKeys        AccessKey[]
 
     @@unique([accountId, tag])
+    @@index([accountId, updatedAt(sort: Desc)])
+    @@index([groupId])
+}
+
+//
+// Groups
+//
+
+model Group {
+    id        String    @id @default(cuid())
+    accountId String
+    account   Account   @relation(fields: [accountId], references: [id])
+    name      String
+    sortOrder Int       @default(0)
+    seq       Int       @default(0)
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    sessions  Session[]
+
+    @@unique([accountId, name])
     @@index([accountId, updatedAt(sort: Desc)])
 }
 

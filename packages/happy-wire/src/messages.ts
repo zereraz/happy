@@ -78,10 +78,46 @@ export const UpdateMachineBodySchema = z.object({
 });
 export type UpdateMachineBody = z.infer<typeof UpdateMachineBodySchema>;
 
+export const UpdateNewGroupBodySchema = z.object({
+  t: z.literal('new-group'),
+  groupId: z.string(),
+  name: z.string(),
+  sortOrder: z.number(),
+  seq: z.number(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type UpdateNewGroupBody = z.infer<typeof UpdateNewGroupBodySchema>;
+
+export const UpdateGroupBodySchema = z.object({
+  t: z.literal('update-group'),
+  groupId: z.string(),
+  name: z.string().optional(),
+  sortOrder: z.number().optional(),
+});
+export type UpdateGroupBody = z.infer<typeof UpdateGroupBodySchema>;
+
+export const DeleteGroupBodySchema = z.object({
+  t: z.literal('delete-group'),
+  groupId: z.string(),
+});
+export type DeleteGroupBody = z.infer<typeof DeleteGroupBodySchema>;
+
+export const UpdateSessionGroupBodySchema = z.object({
+  t: z.literal('update-session-group'),
+  sessionId: z.string(),
+  groupId: z.string().nullable(),
+});
+export type UpdateSessionGroupBody = z.infer<typeof UpdateSessionGroupBodySchema>;
+
 export const CoreUpdateBodySchema = z.discriminatedUnion('t', [
   UpdateNewMessageBodySchema,
   UpdateSessionBodySchema,
   UpdateMachineBodySchema,
+  UpdateNewGroupBodySchema,
+  UpdateGroupBodySchema,
+  DeleteGroupBodySchema,
+  UpdateSessionGroupBodySchema,
 ]);
 export type CoreUpdateBody = z.infer<typeof CoreUpdateBodySchema>;
 

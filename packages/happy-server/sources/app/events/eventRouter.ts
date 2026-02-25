@@ -58,6 +58,7 @@ export type UpdateEvent = {
     metadataVersion: number;
     agentState: string | null;
     agentStateVersion: number;
+    groupId: string | null;
     dataEncryptionKey: string | null;
     active: boolean;
     activeAt: number;
@@ -153,6 +154,26 @@ export type UpdateEvent = {
         value: string | null; // null indicates deletion
         version: number; // -1 for deleted keys
     }>;
+} | {
+    type: 'new-group';
+    groupId: string;
+    name: string;
+    sortOrder: number;
+    seq: number;
+    createdAt: number;
+    updatedAt: number;
+} | {
+    type: 'update-group';
+    groupId: string;
+    name?: string;
+    sortOrder?: number;
+} | {
+    type: 'delete-group';
+    groupId: string;
+} | {
+    type: 'update-session-group';
+    sessionId: string;
+    groupId: string | null;
 };
 
 // === EPHEMERAL EVENT TYPES (Transient) ===
@@ -355,6 +376,7 @@ export function buildNewSessionUpdate(session: {
     metadataVersion: number;
     agentState: string | null;
     agentStateVersion: number;
+    groupId: string | null;
     dataEncryptionKey: Uint8Array | null;
     active: boolean;
     lastActiveAt: Date;
@@ -372,6 +394,7 @@ export function buildNewSessionUpdate(session: {
             metadataVersion: session.metadataVersion,
             agentState: session.agentState,
             agentStateVersion: session.agentStateVersion,
+            groupId: session.groupId,
             dataEncryptionKey: session.dataEncryptionKey ? Buffer.from(session.dataEncryptionKey).toString('base64') : null,
             active: session.active,
             activeAt: session.lastActiveAt.getTime(),
@@ -643,6 +666,69 @@ export function buildKVBatchUpdateUpdate(
         body: {
             t: 'kv-batch-update',
             changes
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildNewGroupUpdate(group: {
+    id: string;
+    name: string;
+    sortOrder: number;
+    seq: number;
+    createdAt: Date;
+    updatedAt: Date;
+}, updateSeq: number, updateId: string): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'new-group',
+            groupId: group.id,
+            name: group.name,
+            sortOrder: group.sortOrder,
+            seq: group.seq,
+            createdAt: group.createdAt.getTime(),
+            updatedAt: group.updatedAt.getTime()
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildUpdateGroupUpdate(groupId: string, updateSeq: number, updateId: string, name?: string, sortOrder?: number): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'update-group',
+            groupId,
+            name,
+            sortOrder
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildDeleteGroupUpdate(groupId: string, updateSeq: number, updateId: string): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'delete-group',
+            groupId
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildUpdateSessionGroupUpdate(sessionId: string, groupId: string | null, updateSeq: number, updateId: string): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'update-session-group',
+            sessionId,
+            groupId
         },
         createdAt: Date.now()
     };
