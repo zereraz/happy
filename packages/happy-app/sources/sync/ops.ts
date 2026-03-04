@@ -531,7 +531,18 @@ export async function groupCreate(name: string, sortOrder?: number): Promise<{ s
         });
         if (response.ok) {
             const data = await response.json();
-            return { success: true, groupId: data.group.id };
+            // Optimistic local insert so the group is available immediately
+            // (don't wait for the WebSocket new-group event)
+            const g = data.group;
+            storage.getState().applyGroups([{
+                id: g.id,
+                name: g.name,
+                sortOrder: g.sortOrder ?? 0,
+                seq: g.seq ?? 0,
+                createdAt: g.createdAt ?? Date.now(),
+                updatedAt: g.updatedAt ?? Date.now(),
+            }]);
+            return { success: true, groupId: g.id };
         } else {
             const error = await response.text();
             return { success: false, message: error || 'Failed to create group' };
