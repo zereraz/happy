@@ -5,6 +5,7 @@
 
 import { apiSocket } from './apiSocket';
 import { sync } from './sync';
+import { storage } from './storage';
 import type { MachineMetadata } from './storageTypes';
 
 // Strict type definitions for all operations
@@ -580,6 +581,8 @@ export async function sessionSetGroup(sessionId: string, groupId: string | null)
             body: JSON.stringify({ groupId }),
         });
         if (response.ok) {
+            // Optimistic local update — don't wait for WebSocket event
+            storage.getState().updateSessionGroup(sessionId, groupId);
             return { success: true };
         } else {
             const error = await response.text();

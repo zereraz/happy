@@ -13,7 +13,7 @@ import { t } from '@/text';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useHeaderHeight } from '@/utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { machineSpawnNewSession } from '@/sync/ops';
+import { machineSpawnNewSession, sessionSetGroup } from '@/sync/ops';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
 import { SessionTypeSelector } from '@/components/SessionTypeSelector';
@@ -264,11 +264,12 @@ function NewSessionWizard() {
     const { theme, rt } = useUnistyles();
     const router = useRouter();
     const safeArea = useSafeAreaInsets();
-    const { prompt, dataId, machineId: machineIdParam, path: pathParam } = useLocalSearchParams<{
+    const { prompt, dataId, machineId: machineIdParam, path: pathParam, groupId: groupIdParam } = useLocalSearchParams<{
         prompt?: string;
         dataId?: string;
         machineId?: string;
         path?: string;
+        groupId?: string;
     }>();
 
     // Try to get data from temporary store first
@@ -1051,6 +1052,11 @@ function NewSessionWizard() {
                     storage.getState().updateSessionModelMode(result.sessionId, modelMode.key);
                 }
 
+                // Assign to group if created from a group context
+                if (groupIdParam) {
+                    await sessionSetGroup(result.sessionId, groupIdParam);
+                }
+
                 // Send initial message if provided
                 if (sessionPrompt.trim()) {
                     await sync.sendMessage(result.sessionId, sessionPrompt);
@@ -1077,7 +1083,7 @@ function NewSessionWizard() {
             Modal.alert(t('common.error'), errorMessage);
             setIsCreating(false);
         }
-    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, recentMachinePaths, profileMap, router]);
+    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, recentMachinePaths, profileMap, router, groupIdParam]);
 
     const screenWidth = useWindowDimensions().width;
 

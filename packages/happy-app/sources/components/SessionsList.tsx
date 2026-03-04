@@ -26,7 +26,8 @@ import { useRouter } from 'expo-router';
 import { Item } from './Item';
 import { ItemGroup } from './ItemGroup';
 import { useHappyAction } from '@/hooks/useHappyAction';
-import { sessionDelete } from '@/sync/ops';
+import { sessionDelete, groupUpdate, groupDelete } from '@/sync/ops';
+import { Group } from '@/sync/storageTypes';
 import { HappyError } from '@/utils/errors';
 import { Modal } from '@/modal';
 
@@ -47,6 +48,21 @@ const stylesheet = StyleSheet.create((theme) => ({
         paddingHorizontal: 24,
         paddingTop: 20,
         paddingBottom: 8,
+    },
+    groupHeaderSection: {
+        backgroundColor: theme.colors.groupped.background,
+        paddingHorizontal: 24,
+        paddingTop: 20,
+        paddingBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    groupHeaderLeft: {
+        flex: 1,
+    },
+    groupHeaderAdd: {
+        padding: 4,
     },
     headerText: {
         fontSize: 14,
@@ -278,11 +294,9 @@ export function SessionsList() {
 
             case 'group-header':
                 return (
-                    <View style={styles.headerSection}>
-                        <Text style={styles.headerText}>
-                            {item.group.name}
-                        </Text>
-                    </View>
+                    <GroupHeader
+                        group={item.group}
+                    />
                 );
 
             case 'session':
@@ -333,6 +347,71 @@ export function SessionsList() {
         </View>
     );
 }
+
+// Group header with + button and long-press actions
+const GroupHeader = React.memo(({ group }: { group: Group }) => {
+    const styles = stylesheet;
+    const router = useRouter();
+    const { theme } = useUnistyles();
+
+    const handleNewSession = React.useCallback(() => {
+        router.push(`/new?groupId=${group.id}`);
+    }, [group.id, router]);
+
+    const handleLongPress = React.useCallback(() => {
+        Modal.alert(
+            group.name,
+            undefined,
+            [
+                {
+                    text: 'Rename Group',
+                    onPress: async () => {
+                        const name = await Modal.prompt(
+                            'Rename Group',
+                            undefined,
+                            { placeholder: group.name, defaultValue: group.name }
+                        );
+                        if (name && name.trim() && name.trim() !== group.name) {
+                            await groupUpdate(group.id, { name: name.trim() });
+                        }
+                    },
+                },
+                {
+                    text: 'Delete Group',
+                    style: 'destructive',
+                    onPress: async () => {
+                        Modal.alert(
+                            'Delete Group',
+                            `Delete "${group.name}"? Sessions will become ungrouped.`,
+                            [
+                                { text: t('common.cancel'), style: 'cancel' },
+                                {
+                                    text: 'Delete',
+                                    style: 'destructive',
+                                    onPress: () => groupDelete(group.id),
+                                },
+                            ]
+                        );
+                    },
+                },
+                { text: t('common.cancel'), style: 'cancel' },
+            ]
+        );
+    }, [group.id, group.name]);
+
+    return (
+        <View style={styles.groupHeaderSection}>
+            <Pressable onLongPress={handleLongPress} style={styles.groupHeaderLeft}>
+                <Text style={styles.headerText}>
+                    {group.name}
+                </Text>
+            </Pressable>
+            <Pressable onPress={handleNewSession} hitSlop={8} style={styles.groupHeaderAdd}>
+                <Ionicons name="add" size={18} color={theme.colors.groupped.sectionTitle} />
+            </Pressable>
+        </View>
+    );
+});
 
 // Sub-component that handles session message logic
 const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }: {
