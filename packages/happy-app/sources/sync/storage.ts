@@ -171,9 +171,10 @@ function buildSessionListViewData(
         }
     });
 
-    // Sort sessions by updated date (newest first)
-    activeSessions.sort((a, b) => b.updatedAt - a.updatedAt);
-    inactiveSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+    // Sort sessions by last activity (newest first)
+    const sortKey = (s: Session) => s.lastMessageAt ?? s.updatedAt;
+    activeSessions.sort((a, b) => sortKey(b) - sortKey(a));
+    inactiveSessions.sort((a, b) => sortKey(b) - sortKey(a));
 
     // Build unified list view data
     const listData: SessionListViewItem[] = [];
@@ -192,7 +193,7 @@ function buildSessionListViewData(
     let currentDateString: string | null = null;
 
     for (const session of inactiveSessions) {
-        const sessionDate = new Date(session.updatedAt);
+        const sessionDate = new Date(sortKey(session));
         const dateString = sessionDate.toDateString();
 
         if (currentDateString !== dateString) {
