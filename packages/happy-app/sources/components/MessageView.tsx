@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text } from "react-native";
+import { View, Text, Platform } from "react-native";
 import { StyleSheet } from 'react-native-unistyles';
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from '@/text';
@@ -12,15 +12,19 @@ import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
 import { useSetting } from "@/sync/storage";
 
-export const MessageView = (props: {
+// On web, allow drag-to-select across View boundaries.
+// RN Web sets user-select: none on Views which breaks multi-element selection.
+const webTextSelect = Platform.OS === 'web' ? { userSelect: 'text' as const } : {};
+
+export const MessageView = React.memo((props: {
   message: Message;
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
 }) => {
   return (
-    <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
-      <View style={styles.messageContent}>
+    <View style={[styles.messageContainer, webTextSelect]}>
+      <View style={[styles.messageContent, webTextSelect]}>
         <RenderBlock
           message={props.message}
           metadata={props.metadata}
@@ -30,7 +34,7 @@ export const MessageView = (props: {
       </View>
     </View>
   );
-};
+});
 
 // RenderBlock function that dispatches to the correct component based on message kind
 function RenderBlock(props: {
@@ -74,8 +78,8 @@ function UserTextBlock(props: {
   }, [props.sessionId]);
 
   return (
-    <View style={styles.userMessageContainer}>
-      <View style={styles.userMessageBubble}>
+    <View style={[styles.userMessageContainer, webTextSelect]}>
+      <View style={[styles.userMessageBubble, webTextSelect]}>
         <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
         {/* {__DEV__ && (
           <Text style={styles.debugText}>{JSON.stringify(props.message.meta)}</Text>
@@ -100,7 +104,7 @@ function AgentTextBlock(props: {
   }
 
   return (
-    <View style={[styles.agentMessageContainer, props.message.isThinking && { opacity: 0.3 }]}>
+    <View style={[styles.agentMessageContainer, webTextSelect, props.message.isThinking && { opacity: 0.3 }]}>
       <MarkdownView markdown={props.message.text} onOptionPress={handleOptionPress} />
     </View>
   );

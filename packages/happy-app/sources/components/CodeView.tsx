@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Text, View, Platform } from 'react-native';
+import { Text, View, ScrollView, Platform } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 interface CodeViewProps {
@@ -7,13 +7,19 @@ interface CodeViewProps {
     language?: string;
 }
 
-export const CodeView = React.memo<CodeViewProps>(({ 
-    code, 
+export const CodeView = React.memo<CodeViewProps>(({
+    code,
     language
 }) => {
     return (
         <View style={styles.codeBlock}>
-            <Text style={styles.codeText}>{code}</Text>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                nestedScrollEnabled={true}
+            >
+                <Text style={styles.codeText}>{code}</Text>
+            </ScrollView>
         </View>
     );
 });

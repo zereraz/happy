@@ -44,9 +44,10 @@ export const MarkdownView = React.memo((props: {
             Modal.alert('Error', 'Failed to open text selection. Please try again.');
         }
     }, [props.markdown, router]);
+    const webTextSelect = Platform.OS === 'web' ? { userSelect: 'text' as const } : {};
     const renderContent = () => {
         return (
-            <View style={{ width: '100%' }}>
+            <View style={[{ width: '100%' }, webTextSelect]}>
                 {blocks.map((block, index) => {
                     if (block.type === 'text') {
                         return <RenderTextBlock spans={block.content} key={index} first={index === 0} last={index === blocks.length - 1} selectable={selectable} />;
@@ -113,7 +114,7 @@ function RenderHeaderBlock(props: { level: 1 | 2 | 3 | 4 | 5 | 6, spans: Markdow
 function RenderListBlock(props: { items: MarkdownSpan[][], first: boolean, last: boolean, selectable: boolean }) {
     const listStyle = [style.text, style.list];
     return (
-        <View style={{ flexDirection: 'column', marginBottom: 8, gap: 1 }}>
+        <View style={{ flexDirection: 'column', marginBottom: 8, gap: 1, ...(Platform.OS === 'web' ? { userSelect: 'text' as const } : {}) }}>
             {props.items.map((item, index) => (
                 <Text selectable={props.selectable} style={listStyle} key={index}>- <RenderSpans spans={item} baseStyle={listStyle} /></Text>
             ))}
@@ -124,7 +125,7 @@ function RenderListBlock(props: { items: MarkdownSpan[][], first: boolean, last:
 function RenderNumberedListBlock(props: { items: { number: number, spans: MarkdownSpan[] }[], first: boolean, last: boolean, selectable: boolean }) {
     const listStyle = [style.text, style.list];
     return (
-        <View style={{ flexDirection: 'column', marginBottom: 8, gap: 1 }}>
+        <View style={{ flexDirection: 'column', marginBottom: 8, gap: 1, ...(Platform.OS === 'web' ? { userSelect: 'text' as const } : {}) }}>
             {props.items.map((item, index) => (
                 <Text selectable={props.selectable} style={listStyle} key={index}>{item.number.toString()}. <RenderSpans spans={item.spans} baseStyle={listStyle} /></Text>
             ))}
@@ -245,7 +246,7 @@ function RenderTableBlock(props: {
         <View style={[style.tableContainer, props.first && style.first, props.last && style.last]}>
             <ScrollView
                 horizontal
-                showsHorizontalScrollIndicator={Platform.OS !== 'web'}
+                showsHorizontalScrollIndicator={true}
                 nestedScrollEnabled={true}
                 style={style.tableScrollView}
             >
@@ -511,9 +512,11 @@ const style = StyleSheet.create((theme) => ({
     },
     tableContent: {
         flexDirection: 'row',
+        flexShrink: 0,
     },
     tableColumn: {
         flexDirection: 'column',
+        flexShrink: 0,
         borderRightWidth: 1,
         borderRightColor: theme.colors.divider,
     },
@@ -541,12 +544,14 @@ const style = StyleSheet.create((theme) => ({
         color: theme.colors.text,
         fontSize: 16,
         lineHeight: 24,
+        flexShrink: 0,
     },
     tableCellText: {
         ...Typography.default(),
         color: theme.colors.text,
         fontSize: 16,
         lineHeight: 24,
+        flexShrink: 0,
     },
 
     // Add global style for Web platform (Unistyles supports this via compiler plugin)

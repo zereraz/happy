@@ -247,14 +247,14 @@ const tokenizeCode = (code: string, language: string | null) => {
   return tokens;
 };
 
-export const SimpleSyntaxHighlighter: React.FC<SimpleSyntaxHighlighterProps> = ({
+export const SimpleSyntaxHighlighter: React.FC<SimpleSyntaxHighlighterProps> = React.memo(({
   code,
   language,
   selectable
 }) => {
   const { theme } = useUnistyles();
   const colors = getColors(theme);
-  const tokens = tokenizeCode(code, language);
+  const tokens = React.useMemo(() => tokenizeCode(code, language), [code, language]);
 
   const getColorForType = (type: string, nestLevel?: number): string => {
     switch (type) {
@@ -319,4 +319,4 @@ export const SimpleSyntaxHighlighter: React.FC<SimpleSyntaxHighlighterProps> = (
       </Text>
     </View>
   );
-}; 
+});
