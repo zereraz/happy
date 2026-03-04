@@ -160,6 +160,8 @@ export const en = {
             light: 'Always use light theme',
             dark: 'Always use dark theme',
         },
+        colorTheme: 'Color Theme',
+        colorThemeDescription: 'Cycle through available color themes',
         display: 'Display',
         displayDescription: 'Control layout and spacing',
         inlineToolCalls: 'Inline Tool Calls',

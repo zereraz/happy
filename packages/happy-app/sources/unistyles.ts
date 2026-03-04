@@ -1,7 +1,7 @@
 import { StyleSheet, UnistylesRuntime } from 'react-native-unistyles';
 import { darkTheme, lightTheme } from './theme';
 import { loadThemePreference, loadThemeId } from './sync/persistence';
-import { getThemeFamily } from './themes';
+import { getThemeFamily, setTauriWindowTheme } from './themes';
 import type { Theme } from './theme';
 import { Appearance } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
@@ -87,3 +87,12 @@ const setRootBackgroundColor = () => {
 
 // Set initial background color
 setRootBackgroundColor();
+
+// Sync Tauri window title bar with the active theme
+const initialIsDark = themePreference === 'adaptive'
+    ? Appearance.getColorScheme() === 'dark'
+    : themePreference === 'dark';
+const initialBgColor = initialIsDark
+    ? appThemes.dark.colors.groupped.background
+    : appThemes.light.colors.groupped.background;
+setTauriWindowTheme(initialIsDark, initialBgColor);

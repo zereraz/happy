@@ -11,7 +11,7 @@ import { Appearance } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { darkTheme, lightTheme } from '@/theme';
 import type { Theme } from '@/theme';
-import { themeRegistry, getThemeFamily } from '@/themes';
+import { themeRegistry, getThemeFamily, setTauriWindowTheme } from '@/themes';
 import { t, getLanguageNativeName, SUPPORTED_LANGUAGES } from '@/text';
 
 // Define known avatar styles for this version of the app
@@ -71,6 +71,7 @@ export default function AppearanceSettingsScreen() {
         const color = isDark ? newDark.colors.groupped.background : newLight.colors.groupped.background;
         UnistylesRuntime.setRootViewBackgroundColor(color);
         SystemUI.setBackgroundColorAsync(color);
+        setTauriWindowTheme(isDark, color);
     };
 
     return (
@@ -96,21 +97,25 @@ export default function AppearanceSettingsScreen() {
                         if (nextTheme === 'adaptive') {
                             UnistylesRuntime.setAdaptiveThemes(true);
                             const systemTheme = Appearance.getColorScheme();
-                            const color = systemTheme === 'dark' ? family.dark.groupped.background : family.light.groupped.background;
+                            const isDark = systemTheme === 'dark';
+                            const color = isDark ? family.dark.groupped.background : family.light.groupped.background;
                             UnistylesRuntime.setRootViewBackgroundColor(color);
                             SystemUI.setBackgroundColorAsync(color);
+                            setTauriWindowTheme(isDark, color);
                         } else {
                             UnistylesRuntime.setAdaptiveThemes(false);
                             UnistylesRuntime.setTheme(nextTheme);
-                            const color = nextTheme === 'dark' ? family.dark.groupped.background : family.light.groupped.background;
+                            const isDark = nextTheme === 'dark';
+                            const color = isDark ? family.dark.groupped.background : family.light.groupped.background;
                             UnistylesRuntime.setRootViewBackgroundColor(color);
                             SystemUI.setBackgroundColorAsync(color);
+                            setTauriWindowTheme(isDark, color);
                         }
                     }}
                 />
                 <Item
-                    title="Color Theme"
-                    subtitle="Cycle through available themes"
+                    title={t('settingsAppearance.colorTheme')}
+                    subtitle={t('settingsAppearance.colorThemeDescription')}
                     icon={<Ionicons name="color-palette-outline" size={29} color={theme.colors.status.connecting} />}
                     detail={getThemeFamily(themeId).name}
                     onPress={() => {
