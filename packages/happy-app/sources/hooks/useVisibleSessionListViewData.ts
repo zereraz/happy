@@ -12,9 +12,9 @@ function sortSessions(sessions: Session[]): Session[] {
         const aOnline = a.presence === 'online';
         const bOnline = b.presence === 'online';
         if (aOnline !== bOnline) return aOnline ? -1 : 1;
-        // 4. By last user message time, fallback to createdAt (stable)
-        const aTime = a.lastMessageAt ?? a.createdAt;
-        const bTime = b.lastMessageAt ?? b.createdAt;
+        // 4. By last user message time, fallback to updatedAt (server-side, always set)
+        const aTime = a.lastMessageAt ?? a.updatedAt;
+        const bTime = b.lastMessageAt ?? b.updatedAt;
         return bTime - aTime;
     });
 }
