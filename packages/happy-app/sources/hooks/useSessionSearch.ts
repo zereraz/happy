@@ -47,11 +47,11 @@ function extractSessions(data: SessionListViewItem[]): Session[] {
 function sessionFingerprint(sessions: Session[]): string {
     let fp = '';
     for (const s of sessions) {
-        fp += s.id;
-        fp += s.metadata?.name ?? '';
-        fp += s.metadata?.path ?? '';
-        fp += s.metadata?.host ?? '';
-        fp += s.metadata?.summary?.text ?? '';
+        fp += s.id + '\0';
+        fp += (s.metadata?.name ?? '') + '\0';
+        fp += (s.metadata?.path ?? '') + '\0';
+        fp += (s.metadata?.host ?? '') + '\0';
+        fp += (s.metadata?.summary?.text ?? '') + '\0';
         fp += '|';
     }
     return fp;
@@ -73,14 +73,24 @@ export function useSessionSearch(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fingerprint]);
 
+    // Build a lookup from latest sessions so search results use fresh data
+    // (Fuse holds refs to sessions from construction time — may have stale
+    // non-search fields like thinking/presence/active)
+    const sessionMap = React.useMemo(() => {
+        const map = new Map<string, Session>();
+        for (const s of sessions) map.set(s.id, s);
+        return map;
+    }, [sessions]);
+
     return React.useMemo(() => {
         if (!data) return data;
         if (!query.trim()) return data;
 
         const results = fuse.search(query.trim());
-        return results.map(r => ({
-            type: 'session' as const,
-            session: r.item,
-        }));
-    }, [data, query, fuse]);
+        return results.flatMap(r => {
+            const fresh = sessionMap.get(r.item.id);
+            if (!fresh) return [];
+            return [{ type: 'session' as const, session: fresh }];
+        });
+    }, [data, query, fuse, sessionMap]);
 }
