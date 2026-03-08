@@ -172,6 +172,8 @@ export const pl: TranslationStructure = {
             light: 'Zawsze używaj jasnego motywu',
             dark: 'Zawsze używaj ciemnego motywu',
         },
+        colorTheme: 'Motyw kolorystyczny',
+        colorThemeDescription: 'Przełączaj między dostępnymi motywami kolorów',
         display: 'Wyświetlanie',
         displayDescription: 'Kontroluj układ i odstępy',
         inlineToolCalls: 'Wbudowane wywołania narzędzi',
@@ -478,6 +480,8 @@ export const pl: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: 'Szukaj sesji...',
+        noSearchResults: 'Nie znaleziono sesji',
     },
 
     toolView: {

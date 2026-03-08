@@ -161,6 +161,8 @@ export const ca: TranslationStructure = {
             light: 'Usa sempre el tema clar',
             dark: 'Usa sempre el tema fosc',
         },
+        colorTheme: 'Tema de color',
+        colorThemeDescription: 'Canvia entre els temes de color disponibles',
         display: 'Pantalla',
         displayDescription: 'Controla la disposició i l\'espaiat',
         inlineToolCalls: 'Crides d\'eines en línia',
@@ -468,6 +470,8 @@ export const ca: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: 'Cerca sessions...',
+        noSearchResults: 'No s\'han trobat sessions',
     },
 
     toolView: {

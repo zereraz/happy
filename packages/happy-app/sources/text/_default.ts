@@ -469,6 +469,8 @@ export const en = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: 'Search sessions...',
+        noSearchResults: 'No sessions found',
     },
 
     toolView: {

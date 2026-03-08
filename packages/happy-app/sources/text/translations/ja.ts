@@ -193,6 +193,8 @@ export const ja: TranslationStructure = {
             light: '常にライトテーマを使用',
             dark: '常にダークテーマを使用',
         },
+        colorTheme: 'カラーテーマ',
+        colorThemeDescription: '利用可能なカラーテーマを切り替え',
         display: '表示',
         displayDescription: 'レイアウトと間隔を調整',
         inlineToolCalls: 'ツール呼び出しをインライン表示',
@@ -500,6 +502,8 @@ export const ja: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: 'セッションを検索...',
+        noSearchResults: 'セッションが見つかりません',
     },
 
     toolView: {

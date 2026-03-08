@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable, FlatList, Platform } from 'react-native';
+import { View, Pressable, FlatList, Platform, TextInput } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Text } from '@/components/StyledText';
 import { usePathname } from 'expo-router';
@@ -30,6 +30,7 @@ import { sessionDelete, groupUpdate, groupDelete } from '@/sync/ops';
 import { Group } from '@/sync/storageTypes';
 import { HappyError } from '@/utils/errors';
 import { Modal } from '@/modal';
+import { useSessionSearch } from '@/hooks/useSessionSearch';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -208,12 +209,76 @@ const stylesheet = StyleSheet.create((theme) => ({
         textAlign: 'center',
         ...Typography.default('semiBold'),
     },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 8,
+        paddingHorizontal: 12,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: theme.colors.surface,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        padding: 0,
+        ...Typography.default(),
+    },
+    emptySearch: {
+        paddingVertical: 40,
+        alignItems: 'center',
+    },
+    emptySearchText: {
+        fontSize: 15,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+    },
 }));
+
+// Extracted search bar — manages its own input state to avoid FlatList re-renders on every keystroke.
+// Debounces 200ms before calling onQueryChange which triggers the actual Fuse.js search.
+const SearchBar = React.memo(({ onQueryChange }: { onQueryChange: (q: string) => void }) => {
+    const styles = stylesheet;
+    const { theme } = useUnistyles();
+    const [text, setText] = React.useState('');
+    const timerRef = React.useRef<ReturnType<typeof setTimeout>>();
+
+    const handleChange = React.useCallback((value: string) => {
+        setText(value);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => onQueryChange(value), 200);
+    }, [onQueryChange]);
+
+    React.useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+    return (
+        <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={16} color={theme.colors.textSecondary} style={styles.searchIcon} />
+            <TextInput
+                style={[styles.searchInput, { color: theme.colors.text }]}
+                placeholder={t('sidebar.searchPlaceholder')}
+                placeholderTextColor={theme.colors.textSecondary}
+                value={text}
+                onChangeText={handleChange}
+                autoCorrect={false}
+                autoCapitalize="none"
+                clearButtonMode="while-editing"
+            />
+        </View>
+    );
+});
 
 export function SessionsList() {
     const styles = stylesheet;
     const safeArea = useSafeAreaInsets();
-    const data = useVisibleSessionListViewData();
+    const rawData = useVisibleSessionListViewData();
+    const [searchQuery, setSearchQuery] = React.useState('');
+    const data = useSessionSearch(searchQuery, rawData);
     const pathname = usePathname();
     const isTablet = useIsTablet();
     const navigateToSession = useNavigateToSession();
@@ -325,11 +390,13 @@ export function SessionsList() {
     // Remove this section as we'll use FlatList for all items now
 
 
-    const HeaderComponent = React.useCallback(() => {
-        return (
+    const onSearchChange = React.useCallback((q: string) => setSearchQuery(q), []);
+    const HeaderComponent = React.useCallback(() => (
+        <>
             <UpdateBanner />
-        );
-    }, []);
+            <SearchBar onQueryChange={onSearchChange} />
+        </>
+    ), [onSearchChange]);
 
     // Footer removed - all sessions now shown inline
 
@@ -342,6 +409,11 @@ export function SessionsList() {
                     keyExtractor={keyExtractor}
                     contentContainerStyle={{ paddingBottom: safeArea.bottom + 128, maxWidth: layout.maxWidth }}
                     ListHeaderComponent={HeaderComponent}
+                    ListEmptyComponent={searchQuery.trim() ? (
+                        <View style={styles.emptySearch}>
+                            <Text style={styles.emptySearchText}>{t('sidebar.noSearchResults')}</Text>
+                        </View>
+                    ) : null}
                 />
             </View>
         </View>

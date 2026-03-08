@@ -163,6 +163,8 @@ export const zhHans: TranslationStructure = {
             light: '始终使用浅色主题',
             dark: '始终使用深色主题',
         },
+        colorTheme: '颜色主题',
+        colorThemeDescription: '切换可用的颜色主题',
         display: '显示',
         displayDescription: '控制布局和间距',
         inlineToolCalls: '内联工具调用',
@@ -470,6 +472,8 @@ export const zhHans: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: '搜索会话...',
+        noSearchResults: '未找到会话',
     },
 
     toolView: {

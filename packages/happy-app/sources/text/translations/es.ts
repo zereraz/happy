@@ -161,6 +161,8 @@ export const es: TranslationStructure = {
             light: 'Usar siempre tema claro',
             dark: 'Usar siempre tema oscuro',
         },
+        colorTheme: 'Tema de color',
+        colorThemeDescription: 'Ciclar entre temas de color disponibles',
         display: 'Pantalla',
         displayDescription: 'Controla diseño y espaciado',
         inlineToolCalls: 'Llamadas a herramientas en línea',
@@ -468,6 +470,8 @@ export const es: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: 'Buscar sesiones...',
+        noSearchResults: 'No se encontraron sesiones',
     },
 
     toolView: {

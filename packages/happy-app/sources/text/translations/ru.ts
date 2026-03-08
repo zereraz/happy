@@ -143,6 +143,8 @@ export const ru: TranslationStructure = {
             light: 'Всегда использовать светлую тему',
             dark: 'Всегда использовать тёмную тему',
         },
+        colorTheme: 'Цветовая тема',
+        colorThemeDescription: 'Переключение между доступными цветовыми темами',
         display: 'Отображение',
         displayDescription: 'Управление макетом и интервалами',
         inlineToolCalls: 'Встроенные вызовы инструментов',
@@ -478,6 +480,8 @@ export const ru: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: 'Поиск сессий...',
+        noSearchResults: 'Сессии не найдены',
     },
 
     toolView: {

@@ -162,6 +162,8 @@ export const zhHant: TranslationStructure = {
             light: '始終使用淺色主題',
             dark: '始終使用深色主題',
         },
+        colorTheme: '顏色主題',
+        colorThemeDescription: '切換可用的顏色主題',
         display: '顯示',
         displayDescription: '控制版面配置和間距',
         inlineToolCalls: '內嵌工具呼叫',
@@ -469,6 +471,8 @@ export const zhHant: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Happy',
+        searchPlaceholder: '搜尋對話...',
+        noSearchResults: '未找到對話',
     },
 
     toolView: {
