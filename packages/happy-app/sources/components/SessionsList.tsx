@@ -391,7 +391,7 @@ export function SessionsList() {
 
 
     const onSearchChange = React.useCallback((q: string) => setSearchQuery(q), []);
-    const HeaderComponent = React.useCallback(() => (
+    const headerElement = React.useMemo(() => (
         <>
             <UpdateBanner />
             <SearchBar onQueryChange={onSearchChange} />
@@ -408,7 +408,7 @@ export function SessionsList() {
                     renderItem={renderItem}
                     keyExtractor={keyExtractor}
                     contentContainerStyle={{ paddingBottom: safeArea.bottom + 128, maxWidth: layout.maxWidth }}
-                    ListHeaderComponent={HeaderComponent}
+                    ListHeaderComponent={headerElement}
                     ListEmptyComponent={searchQuery.trim() ? (
                         <View style={styles.emptySearch}>
                             <Text style={styles.emptySearchText}>{t('sidebar.noSearchResults')}</Text>
