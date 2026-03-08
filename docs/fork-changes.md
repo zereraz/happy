@@ -23,8 +23,10 @@ Replaces path-grouped sidebar with flat recency-sorted list, with optional group
 
 ### Sort order
 1. **Streaming** (`thinking=true`) → top
-2. **By `lastMessageAt`** (last user message timestamp) → most recent first
-3. **Fallback** `createdAt` (stable, no flicker)
+2. **Active** above inactive/archived
+3. **Online** (`presence === 'online'`) above offline
+4. **By `lastMessageAt`** (last user message timestamp) → most recent first
+5. **Fallback** `activeAt` (last CLI heartbeat — frozen for stopped sessions, best proxy for "last used")
 
 ### Groups
 - User-defined groups stored server-side (`Group` type in `storageTypes.ts`)
@@ -37,7 +39,7 @@ Replaces path-grouped sidebar with flat recency-sorted list, with optional group
 - Set in `applyMessages()` when user-role messages arrive via sync
 - Reverse-scans batch for last `role === 'user'` message
 - Only updates if newer than existing value
-- Falls back to `createdAt` for sessions without loaded messages
+- Falls back to `activeAt` for sessions without loaded messages (best proxy for "last used")
 
 ### Files
 - `hooks/useVisibleSessionListViewData.ts` — Sort logic + group partitioning

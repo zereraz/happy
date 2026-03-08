@@ -94,7 +94,7 @@ This is a fork (`sahebjot/dev` branch) of the upstream Happy app. We maintain a 
 
 ### What NOT to do
 - Don't modify upstream sort logic in `buildSessionListViewData` — override in `useVisibleSessionListViewData` instead
-- Don't use `updatedAt` or `activeAt` for sidebar sorting — they're noisy (see doc for why)
+- Don't use `updatedAt` for sidebar sorting — it's noisy (bumped by metadata/summary syncs). `activeAt` is OK as fallback (frozen for stopped sessions)
 - Don't add fork flags to `SettingsSchema` as individual fields — use the `forkFlags` record
 
 ## Architecture Overview

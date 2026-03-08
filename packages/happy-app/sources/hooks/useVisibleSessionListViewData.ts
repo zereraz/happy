@@ -12,9 +12,11 @@ function sortSessions(sessions: Session[]): Session[] {
         const aOnline = a.presence === 'online';
         const bOnline = b.presence === 'online';
         if (aOnline !== bOnline) return aOnline ? -1 : 1;
-        // 4. By last user message time, fallback to updatedAt (server-side, always set)
-        const aTime = a.lastMessageAt ?? a.updatedAt;
-        const bTime = b.lastMessageAt ?? b.updatedAt;
+        // 4. By last user message time, fallback to activeAt (last CLI heartbeat — frozen for stopped sessions)
+        // activeAt is better than updatedAt (noisy: bumped by metadata/summary syncs)
+        // and better than createdAt (session birth, could be months old)
+        const aTime = a.lastMessageAt ?? a.activeAt;
+        const bTime = b.lastMessageAt ?? b.activeAt;
         return bTime - aTime;
     });
 }
