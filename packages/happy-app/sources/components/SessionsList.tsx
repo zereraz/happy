@@ -246,7 +246,7 @@ const SearchBar = React.memo(({ onQueryChange }: { onQueryChange: (q: string) =>
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const [text, setText] = React.useState('');
-    const timerRef = React.useRef<ReturnType<typeof setTimeout>>();
+    const timerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
     const handleChange = React.useCallback((value: string) => {
         setText(value);
