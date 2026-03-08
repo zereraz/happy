@@ -4,17 +4,11 @@ import { Session } from '@/sync/storageTypes';
 
 function sortSessions(sessions: Session[]): Session[] {
     return sessions.sort((a, b) => {
-        // 1. Streaming (thinking) sessions at the very top
-        if (a.thinking !== b.thinking) return a.thinking ? -1 : 1;
-        // 2. Active sessions above archived/inactive
-        if (a.active !== b.active) return a.active ? -1 : 1;
-        // 3. Online (connected) sessions above offline ones
+        // 1. Online above offline (matches what user sees: green dot vs "last seen")
         const aOnline = a.presence === 'online';
         const bOnline = b.presence === 'online';
         if (aOnline !== bOnline) return aOnline ? -1 : 1;
-        // 4. By last user message time, fallback to activeAt (last CLI heartbeat — frozen for stopped sessions)
-        // activeAt is better than updatedAt (noisy: bumped by metadata/summary syncs)
-        // and better than createdAt (session birth, could be months old)
+        // 2. By recency
         const aTime = a.lastMessageAt ?? a.activeAt;
         const bTime = b.lastMessageAt ?? b.activeAt;
         return bTime - aTime;
