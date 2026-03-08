@@ -35,17 +35,20 @@ Replaces path-grouped sidebar with flat recency-sorted list, with optional group
 - Ungrouped sessions appear after all groups
 - Group CRUD in fork settings page (create, rename via tap, delete via long-press)
 
-### `lastMessageAt` — client-side computed
+### `lastMessageAt` — client-side computed, MMKV-persisted
 - Set in `applyMessages()` when user-role messages arrive via sync
 - Reverse-scans batch for last `role === 'user'` message
 - Only updates if newer than existing value
-- Falls back to `activeAt` for sessions without loaded messages (best proxy for "last used")
+- **Persisted to MMKV** (`last-message-at` key) so it survives app restarts
+- Restored during initial `applySessions` load (same pattern as drafts/permissionModes)
+- Falls back to `activeAt` for sessions that have never been opened
 
 ### Files
 - `hooks/useVisibleSessionListViewData.ts` — Sort logic + group partitioning
-- `sync/storage.ts` — `lastMessageAt` tracking in `applyMessages`, `useGroups()`
+- `sync/storage.ts` — `lastMessageAt` tracking in `applyMessages`, restore in `applySessions`, `useGroups()`
+- `sync/persistence.ts` — `loadLastMessageAtMap()`, `saveLastMessageAt()` (MMKV)
 - `sync/storageTypes.ts` — `lastMessageAt?: number` on Session, `Group` interface, `groupId` on Session
-- `components/SessionsList.tsx` — Standalone card rendering per session, group headers
+- `components/SessionsList.tsx` — Standalone card rendering per session, group headers, search bar
 
 ### Why not `updatedAt` or `activeAt`?
 - `updatedAt` — Prisma `@updatedAt`, bumped by ANY row change (metadata sync, summary regen)
