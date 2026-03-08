@@ -10,7 +10,7 @@ import { LocalSettings, applyLocalSettings } from "./localSettings";
 import { Purchases, customerInfoToPurchases } from "./purchases";
 import { Profile } from "./profile";
 import { UserProfile, RelationshipUpdatedEvent } from "./friendTypes";
-import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes } from "./persistence";
+import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes, loadLastMessageAtMap, saveLastMessageAt } from "./persistence";
 import type { PermissionModeKey } from '@/components/PermissionModeSelector';
 import type { CustomerInfo } from './revenueCat/types';
 import React from "react";
@@ -259,6 +259,7 @@ export const storage = create<StorageState>()((set, get) => {
     let profile = loadProfile();
     let sessionDrafts = loadSessionDrafts();
     let sessionPermissionModes = loadSessionPermissionModes();
+    let persistedLastMessageAt = loadLastMessageAtMap();
     return {
         settings,
         settingsVersion: version,
@@ -308,9 +309,11 @@ export const storage = create<StorageState>()((set, get) => {
             return Object.values(state.sessions).filter(s => s.active);
         },
         applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => set((state) => {
-            // Load drafts and permission modes if sessions are empty (initial load)
-            const savedDrafts = Object.keys(state.sessions).length === 0 ? sessionDrafts : {};
-            const savedPermissionModes = Object.keys(state.sessions).length === 0 ? sessionPermissionModes : {};
+            // Load drafts, permission modes, and lastMessageAt if sessions are empty (initial load)
+            const isInitialLoad = Object.keys(state.sessions).length === 0;
+            const savedDrafts = isInitialLoad ? sessionDrafts : {};
+            const savedPermissionModes = isInitialLoad ? sessionPermissionModes : {};
+            const savedLastMessageAt = isInitialLoad ? persistedLastMessageAt : {};
 
             // Merge new sessions with existing ones
             const mergedSessions: Record<string, Session> = { ...state.sessions };
@@ -332,11 +335,17 @@ export const storage = create<StorageState>()((set, get) => {
                     (session.permissionMode && session.permissionMode !== 'default' ? session.permissionMode : undefined) ||
                     defaultPermissionMode;
 
+                // Restore lastMessageAt: prefer in-memory, then persisted, then undefined
+                const existingLastMessageAt = state.sessions[session.id]?.lastMessageAt;
+                const persistedLMA = savedLastMessageAt[session.id];
+
                 mergedSessions[session.id] = {
                     ...session,
                     presence,
                     draft: existingDraft || savedDraft || session.draft || null,
-                    permissionMode: resolvedPermissionMode
+                    permissionMode: resolvedPermissionMode,
+                    ...(existingLastMessageAt ? { lastMessageAt: existingLastMessageAt } :
+                        persistedLMA ? { lastMessageAt: persistedLMA } : {})
                 };
             });
 
@@ -543,6 +552,10 @@ export const storage = create<StorageState>()((set, get) => {
                 // This ensures latestUsage is available immediately on load, even before messages are fully loaded
                 let updatedSessions = state.sessions;
                 const hasNewMessageAt = lastMessageAt > 0 && session && lastMessageAt > (session.lastMessageAt ?? 0);
+                // Persist to MMKV so it survives app restarts
+                if (hasNewMessageAt) {
+                    saveLastMessageAt(sessionId, lastMessageAt);
+                }
                 const needsUpdate = ((reducerResult.todos !== undefined || existingSession.reducerState.latestUsage) && session) || hasNewMessageAt;
 
                 if (needsUpdate && session) {

@@ -238,6 +238,24 @@ export function retrieveTempText(id: string): string | null {
     return null;
 }
 
+export function loadLastMessageAtMap(): Record<string, number> {
+    const raw = mmkv.getString('last-message-at');
+    if (raw) {
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            return {};
+        }
+    }
+    return {};
+}
+
+export function saveLastMessageAt(sessionId: string, timestamp: number) {
+    const map = loadLastMessageAtMap();
+    map[sessionId] = timestamp;
+    mmkv.set('last-message-at', JSON.stringify(map));
+}
+
 export function clearPersistence() {
     mmkv.clearAll();
 }
