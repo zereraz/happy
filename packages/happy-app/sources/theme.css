@@ -42,17 +42,17 @@
     width: 12px;
 }
 
-/* Text selection — force all rendered text to be selectable on web/Tauri.
-   React Native Web's `selectable` prop doesn't reliably set CSS user-select
+/* Text selection — force all elements to be drag-selectable on web/Tauri.
+   React Native Web sets user-select:none on every View (div), blocking
    in Tauri's webview, especially across nested <Text>/<span> elements
    inside ScrollViews and code blocks. */
-span, p, pre, code, div[dir="auto"] {
+span, p, pre, code, div {
     -webkit-user-select: text;
     user-select: text;
 }
 
 /* Prevent selection on interactive elements */
-[role="button"], button, input, textarea {
+[role="button"], button, input {
     -webkit-user-select: none;
     user-select: none;
 }

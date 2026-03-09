@@ -12,12 +12,13 @@ import { Message } from '@/sync/typesMessage';
 const isWeb = Platform.OS === 'web';
 
 export const ChatList = React.memo((props: { session: Session }) => {
-    const { messages } = useSessionMessages(props.session.id);
+    const { messages, isLoaded } = useSessionMessages(props.session.id);
     return (
         <ChatListInternal
             metadata={props.session.metadata}
             sessionId={props.session.id}
             messages={messages}
+            isLoaded={isLoaded}
         />
     )
 });
@@ -41,38 +42,88 @@ const ChatListInternal = React.memo((props: {
     metadata: Metadata | null,
     sessionId: string,
     messages: Message[],
+    isLoaded: boolean,
 }) => {
     // Use ref for metadata so renderItem stays stable across metadata changes.
-    // MessageView reads the latest metadata via ref without causing FlatList to
-    // recreate all visible items.
     const metadataRef = React.useRef(props.metadata);
     metadataRef.current = props.metadata;
-
-    const flatListRef = React.useRef<FlatList>(null);
-    // Track whether user is scrolled to the bottom (for web auto-scroll)
-    const isAtBottomRef = React.useRef(true);
-
-    // On web: reverse messages for non-inverted list (oldest first, newest at bottom).
-    // On native: keep original order (newest first, inverted renders it bottom-up).
-    const data = React.useMemo(
-        () => isWeb ? [...props.messages].reverse() : props.messages,
-        [props.messages]
-    );
 
     const keyExtractor = useCallback((item: any) => item.id, []);
     const renderItem = useCallback(({ item }: { item: any }) => (
         <MessageView message={item} metadata={metadataRef.current} sessionId={props.sessionId} />
     ), [props.sessionId]);
 
-    // Web: auto-scroll to bottom when new content arrives (if user is near bottom)
-    const onContentSizeChange = useCallback(() => {
-        if (isAtBottomRef.current) {
-            flatListRef.current?.scrollToEnd({ animated: false });
-        }
+    if (!isWeb) {
+        return (
+            <FlatList
+                data={props.messages}
+                inverted={true}
+                keyExtractor={keyExtractor}
+                maintainVisibleContentPosition={{
+                    minIndexForVisible: 0,
+                    autoscrollToTopThreshold: 10,
+                }}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="interactive"
+                renderItem={renderItem}
+                ListHeaderComponent={<ListFooter sessionId={props.sessionId} />}
+                ListFooterComponent={<ListHeader />}
+            />
+        );
+    }
+
+    return <WebChatList {...props} isLoaded={props.isLoaded} keyExtractor={keyExtractor} renderItem={renderItem} />;
+});
+
+// Web/Tauri: non-inverted list with manual scroll-to-bottom.
+// scaleY(-1) inversion doesn't set initial scroll position correctly in WebKit,
+// so we use a normal list with reversed data and scroll to the end ourselves.
+const WebChatList = React.memo((props: {
+    metadata: Metadata | null,
+    sessionId: string,
+    messages: Message[],
+    isLoaded: boolean,
+    keyExtractor: (item: any) => string,
+    renderItem: (info: { item: any }) => React.ReactElement,
+}) => {
+    const flatListRef = React.useRef<FlatList>(null);
+    // true until user scrolls away from bottom
+    const isAtBottomRef = React.useRef(true);
+    // Suppresses onScroll tracking during programmatic scrolls
+    const isProgrammaticScrollRef = React.useRef(false);
+
+    // Reverse data: oldest first, newest at bottom
+    const data = React.useMemo(
+        () => [...props.messages].reverse(),
+        [props.messages]
+    );
+
+    const scrollToBottom = useCallback(() => {
+        isProgrammaticScrollRef.current = true;
+        flatListRef.current?.scrollToEnd({ animated: false });
+        // Allow onScroll tracking again after scroll settles
+        setTimeout(() => { isProgrammaticScrollRef.current = false; }, 300);
     }, []);
 
-    // Web: track scroll position to decide whether to auto-scroll
+    // Scroll to bottom only after all messages have loaded
+    const hasInitialScrollRef = React.useRef(false);
+    React.useEffect(() => {
+        if (props.isLoaded && data.length > 0 && !hasInitialScrollRef.current) {
+            hasInitialScrollRef.current = true;
+            setTimeout(scrollToBottom, 50);
+        }
+    }, [props.isLoaded, data.length, scrollToBottom]);
+
+    // Auto-scroll to bottom when new content arrives (if user is near bottom)
+    const onContentSizeChange = useCallback(() => {
+        if (isAtBottomRef.current) {
+            scrollToBottom();
+        }
+    }, [scrollToBottom]);
+
+    // Track scroll position — skip during programmatic scrolls
     const onScroll = useCallback((event: any) => {
+        if (isProgrammaticScrollRef.current) return;
         const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
         const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
         isAtBottomRef.current = distanceFromBottom < 150;
@@ -82,31 +133,21 @@ const ChatListInternal = React.memo((props: {
         <FlatList
             ref={flatListRef}
             data={data}
-            inverted={!isWeb}
-            keyExtractor={keyExtractor}
-            {...(!isWeb && {
-                maintainVisibleContentPosition: {
-                    minIndexForVisible: 0,
-                    autoscrollToTopThreshold: 100,
-                },
-            })}
-            // On web, disable virtualization — browser DOM handles it fine and
-            // windowed rendering causes items to vanish during streaming updates.
-            windowSize={isWeb ? 999 : 11}
-            {...(isWeb && { removeClippedSubviews: false, initialNumToRender: 999 })}
-            // On web, allow drag-to-select text across message boundaries
-            {...(isWeb && { contentContainerStyle: { userSelect: 'text' as const } })}
+            keyExtractor={props.keyExtractor}
+            // Disable virtualization — browser DOM handles it fine and
+            // windowed rendering causes items to vanish during streaming.
+            windowSize={999}
+            removeClippedSubviews={false}
+            initialNumToRender={999}
+            contentContainerStyle={{ userSelect: 'text' as any }}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
-            renderItem={renderItem}
-            // Inverted swaps header/footer visually. On web (non-inverted) use normal order.
-            ListHeaderComponent={isWeb ? <ListHeader /> : <ListFooter sessionId={props.sessionId} />}
-            ListFooterComponent={isWeb ? <ListFooter sessionId={props.sessionId} /> : <ListHeader />}
-            {...(isWeb && {
-                onContentSizeChange,
-                onScroll,
-                scrollEventThrottle: 100,
-            })}
+            keyboardDismissMode="none"
+            renderItem={props.renderItem}
+            ListHeaderComponent={<ListHeader />}
+            ListFooterComponent={<ListFooter sessionId={props.sessionId} />}
+            onContentSizeChange={onContentSizeChange}
+            onScroll={onScroll}
+            scrollEventThrottle={100}
         />
-    )
+    );
 });

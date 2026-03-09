@@ -538,12 +538,11 @@ export const storage = create<StorageState>()((set, get) => {
                 const messagesArray = Object.values(mergedMessagesMap)
                     .sort((a, b) => b.createdAt - a.createdAt);
 
-                // Last user message timestamp: find the latest user message in the batch
+                // Last message timestamp: find the latest message in the batch (any role)
                 let lastMessageAt = 0;
-                for (let i = normalizedMessages.length - 1; i >= 0; i--) {
-                    if (normalizedMessages[i].role === 'user') {
+                for (let i = 0; i < normalizedMessages.length; i++) {
+                    if (normalizedMessages[i].createdAt > lastMessageAt) {
                         lastMessageAt = normalizedMessages[i].createdAt;
-                        break;
                     }
                 }
 

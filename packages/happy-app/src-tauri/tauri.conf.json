@@ -1,8 +1,8 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Happy",
+  "productName": "Happy (dev)",
   "version": "0.1.0",
-  "identifier": "com.slopus.happy",
+  "identifier": "com.slopus.happy.dev",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:8081",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Happy",
+        "title": "Happy (dev)",
         "width": 800,
         "height": 600,
         "resizable": true,

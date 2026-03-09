@@ -242,6 +242,45 @@ function RenderTableBlock(props: {
     const rowCount = props.rows.length;
     const isLastRow = (rowIndex: number) => rowIndex === rowCount - 1;
 
+    // On web, use CSS overflow instead of ScrollView so text selection works.
+    // ScrollView captures mouse drag for horizontal scrolling, blocking selection.
+    const tableInner = (
+        <View style={style.tableContent}>
+            {props.headers.map((header, colIndex) => (
+                <View
+                    key={`column-${colIndex}`}
+                    style={[
+                        style.tableColumn,
+                        colIndex === columnCount - 1 && style.tableColumnLast
+                    ]}
+                >
+                    <View style={[style.tableCell, style.tableHeaderCell, style.tableCellFirst]}>
+                        <Text selectable style={style.tableHeaderText}>{header}</Text>
+                    </View>
+                    {props.rows.map((row, rowIndex) => (
+                        <View
+                            key={`cell-${rowIndex}-${colIndex}`}
+                            style={[
+                                style.tableCell,
+                                isLastRow(rowIndex) && style.tableCellLast
+                            ]}
+                        >
+                            <Text selectable style={style.tableCellText}>{row[colIndex] ?? ''}</Text>
+                        </View>
+                    ))}
+                </View>
+            ))}
+        </View>
+    );
+
+    if (Platform.OS === 'web') {
+        return (
+            <View style={[style.tableContainer, style.tableContainerWeb, props.first && style.first, props.last && style.last]}>
+                {tableInner}
+            </View>
+        );
+    }
+
     return (
         <View style={[style.tableContainer, props.first && style.first, props.last && style.last]}>
             <ScrollView
@@ -250,35 +289,7 @@ function RenderTableBlock(props: {
                 nestedScrollEnabled={true}
                 style={style.tableScrollView}
             >
-                <View style={style.tableContent}>
-                    {/* Render each column as a vertical container */}
-                    {props.headers.map((header, colIndex) => (
-                        <View
-                            key={`column-${colIndex}`}
-                            style={[
-                                style.tableColumn,
-                                colIndex === columnCount - 1 && style.tableColumnLast
-                            ]}
-                        >
-                            {/* Header cell for this column */}
-                            <View style={[style.tableCell, style.tableHeaderCell, style.tableCellFirst]}>
-                                <Text style={style.tableHeaderText}>{header}</Text>
-                            </View>
-                            {/* Data cells for this column */}
-                            {props.rows.map((row, rowIndex) => (
-                                <View
-                                    key={`cell-${rowIndex}-${colIndex}`}
-                                    style={[
-                                        style.tableCell,
-                                        isLastRow(rowIndex) && style.tableCellLast
-                                    ]}
-                                >
-                                    <Text style={style.tableCellText}>{row[colIndex] ?? ''}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    ))}
-                </View>
+                {tableInner}
             </ScrollView>
         </View>
     );
@@ -398,6 +409,8 @@ const style = StyleSheet.create((theme) => ({
         marginVertical: 8,
         position: 'relative',
         zIndex: 1,
+        // On web, constrain width so the horizontal ScrollView actually scrolls
+        ...(Platform.OS === 'web' ? { maxWidth: '100%', overflow: 'hidden' } : {}),
     },
     copyButtonWrapper: {
         position: 'absolute',
@@ -506,6 +519,12 @@ const style = StyleSheet.create((theme) => ({
         borderRadius: 8,
         overflow: 'hidden',
         alignSelf: 'flex-start',
+        // On web, constrain width so the horizontal ScrollView actually scrolls
+        ...(Platform.OS === 'web' ? { maxWidth: '100%' } : {}),
+    },
+    tableContainerWeb: {
+        overflowX: 'auto' as any,
+        overflowY: 'hidden' as any,
     },
     tableScrollView: {
         flexGrow: 0,

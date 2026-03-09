@@ -8,9 +8,9 @@ function sortSessions(sessions: Session[]): Session[] {
         const aOnline = a.presence === 'online';
         const bOnline = b.presence === 'online';
         if (aOnline !== bOnline) return aOnline ? -1 : 1;
-        // 2. By recency
-        const aTime = a.lastMessageAt ?? a.activeAt;
-        const bTime = b.lastMessageAt ?? b.activeAt;
+        // 2. By recency (don't use activeAt — it updates with heartbeats and causes jumping)
+        const aTime = a.lastMessageAt ?? a.updatedAt;
+        const bTime = b.lastMessageAt ?? b.updatedAt;
         return bTime - aTime;
     });
 }

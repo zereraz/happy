@@ -29,6 +29,8 @@ const styles = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surfaceHigh,
         borderRadius: 6,
         padding: 12,
+        // On web, constrain width so the horizontal ScrollView actually scrolls
+        ...(Platform.OS === 'web' ? { maxWidth: '100%', overflow: 'hidden' } : {}),
     },
     codeText: {
         fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
