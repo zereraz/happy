@@ -202,6 +202,15 @@ export const ru: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: 'Заметки к чату',
+        chatNotesDescription: 'Добавляйте личные заметки к любой сессии чата.',
+        chatNotesEnabled: 'Иконка заметок отображается в шапке чата',
+        chatNotesDisabled: 'Функция заметок отключена',
+    },
+
+    chatNotes: {
+        title: 'Заметки',
+        placeholder: 'Напишите ваши заметки здесь...',
     },
 
     errors: {

@@ -220,6 +220,15 @@ export const ca: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: 'Notes del xat',
+        chatNotesDescription: 'Afegeix notes personals a qualsevol sessió de xat.',
+        chatNotesEnabled: 'Icona de notes visible a la capçalera del xat',
+        chatNotesDisabled: 'La funció de notes està desactivada',
+    },
+
+    chatNotes: {
+        title: 'Notes',
+        placeholder: 'Escriu les teves notes aquí...',
     },
 
     errors: {

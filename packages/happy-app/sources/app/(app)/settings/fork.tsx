@@ -20,6 +20,7 @@ export default function ForkSettingsScreen() {
     };
 
     const customSidebar = forkFlags['customSidebar'] ?? false;
+    const chatNotes = forkFlags['chatNotes'] ?? false;
 
     const handleCreateGroup = useCallback(async () => {
         const name = await Modal.prompt('New Group', 'Enter group name', { placeholder: 'Group name' });
@@ -79,6 +80,27 @@ export default function ForkSettingsScreen() {
                         <Switch
                             value={customSidebar}
                             onValueChange={() => toggleFlag('customSidebar')}
+                        />
+                    }
+                    showChevron={false}
+                />
+            </ItemGroup>
+
+            <ItemGroup
+                title={t('settingsFork.chatNotes')}
+                footer={t('settingsFork.chatNotesDescription')}
+            >
+                <Item
+                    title={t('settingsFork.chatNotes')}
+                    subtitle={chatNotes
+                        ? t('settingsFork.chatNotesEnabled')
+                        : t('settingsFork.chatNotesDisabled')
+                    }
+                    icon={<Ionicons name="document-text-outline" size={29} color="#5856D6" />}
+                    rightElement={
+                        <Switch
+                            value={chatNotes}
+                            onValueChange={() => toggleFlag('chatNotes')}
                         />
                     }
                     showChevron={false}

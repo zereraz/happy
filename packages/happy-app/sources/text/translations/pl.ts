@@ -231,6 +231,15 @@ export const pl: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: 'Notatki do czatu',
+        chatNotesDescription: 'Dodawaj osobiste notatki do dowolnej sesji czatu.',
+        chatNotesEnabled: 'Ikona notatek widoczna w nagłówku czatu',
+        chatNotesDisabled: 'Funkcja notatek jest wyłączona',
+    },
+
+    chatNotes: {
+        title: 'Notatki',
+        placeholder: 'Napisz swoje notatki tutaj...',
     },
 
     errors: {

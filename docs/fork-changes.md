@@ -70,6 +70,27 @@ Collapse/expand the sidebar drawer on web/desktop.
 - `components/SidebarNavigator.tsx` — Drawer hide/show + expand button
 - `components/SidebarView.tsx` — `onCollapse` prop + collapse chevron
 
+## Chat Notes (fork flag: `chatNotes`)
+
+Per-session notepad — a notes icon in the chat header opens a sidebar panel with a basic text editor.
+
+### Behavior
+- Toggle `chatNotes` flag in Fork Settings to enable
+- Notes icon (`document-text-outline`) appears in chat header between title and avatar
+- Tapping toggles a 300px side panel with a multiline text editor
+- Notes are stored per-session in MMKV (`session-notes:{sessionId}`)
+- Writes are debounced (500ms) to avoid excessive storage hits
+- Notes persist across app restarts but are device-local (not synced)
+
+### Files
+- `sync/persistence.ts` — `loadSessionNotes()`, `saveSessionNotes()` (MMKV)
+- `hooks/useSessionNotes.ts` — Hook with debounced MMKV persistence
+- `components/ChatNotesPanel.tsx` — Notes sidebar panel component
+- `components/ChatHeaderView.tsx` — `onNotesPress` prop + notes icon button
+- `-session/SessionView.tsx` — Fork flag gate, notes state, panel rendering
+- `app/(app)/settings/fork.tsx` — `chatNotes` toggle
+- `text/_default.ts`, `text/translations/*.ts` — Translation keys
+
 ## Design Decisions
 
 | Decision | Why |
@@ -79,6 +100,7 @@ Collapse/expand the sidebar drawer on web/desktop.
 | `createdAt` as fallback (not `activeAt`) | `activeAt` is a live heartbeat that causes sidebar flicker |
 | Override sort in `useVisibleSessionListViewData` not `buildSessionListViewData` | Upstream function called from multiple places; our hook is the clean interception point |
 | `sidebarCollapsed` in localSettings (not synced) | Screen size varies per device; collapse state shouldn't sync |
+| Chat notes in MMKV per-session key (not synced) | Notes can be large; device-local avoids sync overhead; per-key avoids loading all notes into memory |
 
 ## Commit History
 

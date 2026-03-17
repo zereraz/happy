@@ -249,6 +249,15 @@ export const it: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: 'Note della chat',
+        chatNotesDescription: 'Aggiungi note personali a qualsiasi sessione di chat.',
+        chatNotesEnabled: 'Icona note visibile nell\'intestazione della chat',
+        chatNotesDisabled: 'La funzione note è disattivata',
+    },
+
+    chatNotes: {
+        title: 'Note',
+        placeholder: 'Scrivi le tue note qui...',
     },
 
     errors: {

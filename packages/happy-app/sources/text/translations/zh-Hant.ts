@@ -221,6 +221,15 @@ export const zhHant: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: '聊天筆記',
+        chatNotesDescription: '為任何聊天工作階段新增個人筆記。',
+        chatNotesEnabled: '聊天標題列顯示筆記圖示',
+        chatNotesDisabled: '筆記功能已關閉',
+    },
+
+    chatNotes: {
+        title: '筆記',
+        placeholder: '在這裡寫下你的筆記...',
     },
 
     errors: {

@@ -220,6 +220,15 @@ export const pt: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: 'Notas do chat',
+        chatNotesDescription: 'Adicione notas pessoais a qualquer sessão de chat.',
+        chatNotesEnabled: 'Ícone de notas exibido no cabeçalho do chat',
+        chatNotesDisabled: 'Recurso de notas está desativado',
+    },
+
+    chatNotes: {
+        title: 'Notas',
+        placeholder: 'Escreva suas notas aqui...',
     },
 
     errors: {

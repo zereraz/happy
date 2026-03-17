@@ -252,6 +252,15 @@ export const ja: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: 'チャットメモ',
+        chatNotesDescription: 'チャットセッションに個人メモを追加できます。',
+        chatNotesEnabled: 'チャットヘッダーにメモアイコンを表示',
+        chatNotesDisabled: 'メモ機能はオフです',
+    },
+
+    chatNotes: {
+        title: 'メモ',
+        placeholder: 'ここにメモを書いてください...',
     },
 
     errors: {

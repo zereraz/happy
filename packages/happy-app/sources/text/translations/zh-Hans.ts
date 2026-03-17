@@ -222,6 +222,15 @@ export const zhHans: TranslationStructure = {
         customSidebar: 'Custom Sidebar',
         customSidebarEnabled: 'Sessions grouped by recent activity',
         customSidebarDisabled: 'Using default sidebar layout',
+        chatNotes: '聊天笔记',
+        chatNotesDescription: '为任何聊天会话添加个人笔记。',
+        chatNotesEnabled: '聊天标题栏显示笔记图标',
+        chatNotesDisabled: '笔记功能已关闭',
+    },
+
+    chatNotes: {
+        title: '笔记',
+        placeholder: '在这里写下你的笔记...',
     },
 
     errors: {

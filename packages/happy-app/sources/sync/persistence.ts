@@ -256,6 +256,18 @@ export function saveLastMessageAt(sessionId: string, timestamp: number) {
     mmkv.set('last-message-at', JSON.stringify(map));
 }
 
+export function loadSessionNotes(sessionId: string): string {
+    return mmkv.getString(`session-notes:${sessionId}`) ?? '';
+}
+
+export function saveSessionNotes(sessionId: string, text: string) {
+    if (text) {
+        mmkv.set(`session-notes:${sessionId}`, text);
+    } else {
+        mmkv.delete(`session-notes:${sessionId}`);
+    }
+}
+
 export function clearPersistence() {
     mmkv.clearAll();
 }
