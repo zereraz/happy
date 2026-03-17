@@ -227,6 +227,7 @@ const stylesheet = StyleSheet.create((theme) => ({
         flex: 1,
         fontSize: 15,
         padding: 0,
+        paddingLeft: 4,
         ...Typography.default(),
     },
     emptySearch: {
@@ -392,17 +393,15 @@ export function SessionsList() {
 
     const onSearchChange = React.useCallback((q: string) => setSearchQuery(q), []);
     const headerElement = React.useMemo(() => (
-        <>
-            <UpdateBanner />
-            <SearchBar onQueryChange={onSearchChange} />
-        </>
-    ), [onSearchChange]);
+        <UpdateBanner />
+    ), []);
 
     // Footer removed - all sessions now shown inline
 
     return (
         <View style={styles.container}>
             <View style={styles.contentContainer}>
+                <SearchBar onQueryChange={onSearchChange} />
                 <FlatList
                     data={dataWithSelected}
                     renderItem={renderItem}
