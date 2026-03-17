@@ -33,7 +33,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { useMemo } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react-native';
+import type { ImageContent } from '@slopus/happy-wire';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUnistyles } from 'react-native-unistyles';
 import type { ModelMode, PermissionMode } from '@/components/PermissionModeSelector';
@@ -164,6 +165,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const isLandscape = useIsLandscape();
     const deviceType = useDeviceType();
     const [message, setMessage] = React.useState('');
+    const [pendingImages, setPendingImages] = React.useState<ImageContent[]>([]);
+    const [isLoadingImages, setIsLoadingImages] = React.useState(false);
     const realtimeStatus = useRealtimeStatus();
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
@@ -317,12 +320,76 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 isPulsing: sessionStatus.isPulsing
             }}
             onSend={() => {
-                if (message.trim()) {
+                if (message.trim() || pendingImages.length > 0) {
+                    const text = message.trim() || '(see attached image)';
+                    const images = pendingImages.length > 0 ? [...pendingImages] : undefined;
                     setMessage('');
+                    setPendingImages([]);
                     clearDraft();
-                    sync.sendMessage(sessionId, message);
+                    sync.sendMessage(sessionId, text, undefined, images);
                     trackMessageSent();
                 }
+            }}
+            pendingImages={pendingImages}
+            isLoadingImages={isLoadingImages}
+            onImagePick={async () => {
+                if (Platform.OS === 'web') {
+                    // input.click() must be synchronous with user gesture — no await before it
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+                    input.multiple = true;
+                    input.onchange = async () => {
+                        if (!input.files) return;
+                        setIsLoadingImages(true);
+                        try {
+                            const { resizeImageForUpload } = await import('@/utils/imageResize');
+                            for (const file of Array.from(input.files)) {
+                                const resized = await resizeImageForUpload(file);
+                                if (resized) {
+                                    setPendingImages(prev => [...prev, resized]);
+                                }
+                            }
+                        } finally {
+                            setIsLoadingImages(false);
+                        }
+                    };
+                    input.click();
+                } else {
+                    const ImagePicker = await import('expo-image-picker');
+                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (status !== 'granted') {
+                        Alert.alert('Permission needed', 'Please allow photo library access in Settings to attach images.');
+                        return;
+                    }
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                        mediaTypes: ['images'],
+                        allowsMultipleSelection: true,
+                        quality: 1, // full quality — we resize ourselves
+                    });
+                    if (!result.canceled) {
+                        setIsLoadingImages(true);
+                        try {
+                            const { resizeNativeImageForUpload } = await import('@/utils/imageResize');
+                            for (const asset of result.assets) {
+                                const resized = await resizeNativeImageForUpload(
+                                    asset.uri,
+                                    asset.width,
+                                    asset.height,
+                                    asset.mimeType || 'image/jpeg',
+                                );
+                                if (resized) {
+                                    setPendingImages(prev => [...prev, resized]);
+                                }
+                            }
+                        } finally {
+                            setIsLoadingImages(false);
+                        }
+                    }
+                }
+            }}
+            onImageRemove={(idx) => {
+                setPendingImages(prev => prev.filter((_, i) => i !== idx));
             }}
             onMicPress={micButtonState.onMicPress}
             isMicActive={micButtonState.isMicActive}

@@ -112,6 +112,7 @@
 
 import { Message, ToolCall } from "../typesMessage";
 import { AgentEvent, NormalizedMessage, UsageData } from "../typesRaw";
+import type { ImageContent } from '@slopus/happy-wire';
 import { createTracer, traceMessages, TracerState } from "./reducerTracer";
 import { AgentState } from "../storageTypes";
 import { MessageMeta } from "../typesMessageMeta";
@@ -127,6 +128,7 @@ type ReducerMessage = {
     event: AgentEvent | null;
     tool: ToolCall | null;
     meta?: MessageMeta;
+    images?: ImageContent[];
 }
 
 type StoredPermission = {
@@ -611,6 +613,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                 tool: null,
                 event: null,
                 meta: msg.meta,
+                ...(msg.images?.length ? { images: msg.images } : {}),
             });
 
             // Track both localId and messageId
@@ -1116,7 +1119,8 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
             kind: 'user-text',
             text: reducerMsg.text,
             ...(reducerMsg.meta?.displayText && { displayText: reducerMsg.meta.displayText }),
-            meta: reducerMsg.meta
+            meta: reducerMsg.meta,
+            ...(reducerMsg.images?.length ? { images: reducerMsg.images } : {}),
         };
     } else if (reducerMsg.role === 'agent' && reducerMsg.text !== null) {
         return {

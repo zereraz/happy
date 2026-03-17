@@ -1,5 +1,6 @@
 import * as React from "react";
-import { View, Text, Platform } from "react-native";
+import { View, Text, Platform, Pressable } from "react-native";
+import { Image } from 'expo-image';
 import { StyleSheet } from 'react-native-unistyles';
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from '@/text';
@@ -73,6 +74,7 @@ function UserTextBlock(props: {
   message: UserTextMessage;
   sessionId: string;
 }) {
+  const [expandedImage, setExpandedImage] = React.useState<number | null>(null);
   const handleOptionPress = React.useCallback((option: Option) => {
     sync.sendMessage(props.sessionId, option.title);
   }, [props.sessionId]);
@@ -80,10 +82,20 @@ function UserTextBlock(props: {
   return (
     <View style={[styles.userMessageContainer, webTextSelect]}>
       <View style={[styles.userMessageBubble, webTextSelect]}>
+        {props.message.images && props.message.images.length > 0 && (
+          <View style={styles.imageRow}>
+            {props.message.images.map((img, idx) => (
+              <Pressable key={idx} onPress={() => setExpandedImage(expandedImage === idx ? null : idx)}>
+                <Image
+                  source={{ uri: `data:${img.mimeType};base64,${img.data}` }}
+                  style={expandedImage === idx ? styles.imageExpanded : styles.imageThumbnail}
+                  contentFit="cover"
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
         <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
-        {/* {__DEV__ && (
-          <Text style={styles.debugText}>{JSON.stringify(props.message.meta)}</Text>
-        )} */}
       </View>
     </View>
   );
@@ -222,5 +234,22 @@ const styles = StyleSheet.create((theme) => ({
   debugText: {
     color: theme.colors.agentEventText,
     fontSize: 12,
+  },
+  imageRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  imageThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  imageExpanded: {
+    width: 300,
+    height: 300,
+    borderRadius: 8,
   },
 }));

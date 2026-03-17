@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Update, UpdateMachineBody } from '@slopus/happy-wire';
+import { ImageContentSchema, type Update, type UpdateMachineBody, type ImageContent } from '@slopus/happy-wire';
 import { UsageSchema } from '@/claude/types'
 import type { SandboxConfig } from '@/persistence'
 
@@ -204,12 +204,15 @@ export const CreateSessionResponseSchema = z.object({
 
 export type CreateSessionResponse = z.infer<typeof CreateSessionResponseSchema>
 
+export { ImageContentSchema, type ImageContent } from '@slopus/happy-wire';
+
 export const UserMessageSchema = z.object({
   role: z.literal('user'),
   content: z.object({
     type: z.literal('text'),
     text: z.string()
   }),
+  images: z.array(ImageContentSchema).optional(),
   localKey: z.string().optional(), // Mobile messages include this
   meta: MessageMetaSchema.optional()
 })

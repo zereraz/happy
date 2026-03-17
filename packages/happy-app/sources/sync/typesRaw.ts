@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { isCuid } from '@paralleldrive/cuid2';
 import { MessageMetaSchema, MessageMeta } from './typesMessageMeta';
+import type { ImageContent } from '@slopus/happy-wire';
 
 //
 // Raw types
@@ -444,6 +445,11 @@ const rawRecordSchema = z.preprocess(
                 type: z.literal('text'),
                 text: z.string()
             }),
+            images: z.array(z.object({
+                type: z.literal('image'),
+                mimeType: z.string(),
+                data: z.string(),
+            })).optional(),
             meta: MessageMetaSchema.optional()
         }),
         z.object({
@@ -509,12 +515,15 @@ type NormalizedAgentContent =
         prompt: string
     };
 
+export type { ImageContent } from '@slopus/happy-wire';
+
 export type NormalizedMessage = ({
     role: 'user'
     content: {
         type: 'text';
         text: string;
     }
+    images?: ImageContent[];
 } | {
     role: 'agent'
     content: NormalizedAgentContent[]
@@ -734,6 +743,7 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
             createdAt,
             role: 'user',
             content: raw.content,
+            ...(raw.images?.length ? { images: raw.images } : {}),
             isSidechain: false,
             meta: raw.meta,
         };

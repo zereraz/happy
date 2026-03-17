@@ -1,7 +1,8 @@
 import { EnhancedMode } from "./loop";
 import { query, type QueryOptions, type SDKMessage, type SDKSystemMessage, AbortError, SDKUserMessage } from '@/claude/sdk'
 import { mapToClaudeMode } from "./utils/permissionMode";
-import { claudeCheckSession } from "./utils/claudeCheckSession";
+import { claudeCheckSession, claudeCheckSessionAsync } from "./utils/claudeCheckSession";
+import type { ImageContent } from '@slopus/happy-wire';
 import { join, resolve } from 'node:path';
 import { projectPath } from "@/projectPath";
 import { parseSpecialCommand } from "@/parsers/specialCommands";
@@ -30,7 +31,7 @@ export async function claudeRemote(opts: {
     jsRuntime?: JsRuntime,
 
     // Dynamic parameters
-    nextMessage: () => Promise<{ message: string, mode: EnhancedMode } | null>,
+    nextMessage: () => Promise<{ message: string, mode: EnhancedMode, images?: ImageContent[] } | null>,
     onReady: () => void,
     isAborted: (toolCallId: string) => boolean,
 
@@ -145,13 +146,29 @@ export async function claudeRemote(opts: {
         }
     };
 
+    type TextBlock = { type: 'text'; text: string };
+    type ImageBlock = { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+    type ContentBlock = TextBlock | ImageBlock;
+
+    function buildUserContent(text: string, images?: ImageContent[]): string | ContentBlock[] {
+        if (!images?.length) return text;
+        const blocks: ContentBlock[] = [{ type: 'text', text }];
+        for (const img of images) {
+            blocks.push({
+                type: 'image',
+                source: { type: 'base64', media_type: img.mimeType, data: img.data },
+            });
+        }
+        return blocks;
+    }
+
     // Push initial message
     let messages = new PushableAsyncIterable<SDKUserMessage>();
     messages.push({
         type: 'user',
         message: {
             role: 'user',
-            content: initial.message,
+            content: buildUserContent(initial.message, initial.images),
         },
     });
 
@@ -213,7 +230,7 @@ export async function claudeRemote(opts: {
                     return;
                 }
                 mode = next.mode;
-                messages.push({ type: 'user', message: { role: 'user', content: next.message } });
+                messages.push({ type: 'user', message: { role: 'user', content: buildUserContent(next.message, next.images) } });
             }
 
             // Handle tool result

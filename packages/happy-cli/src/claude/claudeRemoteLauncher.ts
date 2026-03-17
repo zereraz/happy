@@ -7,6 +7,7 @@ import { claudeRemote } from "./claudeRemote";
 import { PermissionHandler } from "./utils/permissionHandler";
 import { Future } from "@/utils/future";
 import { SDKAssistantMessage, SDKMessage, SDKUserMessage } from "./sdk";
+import type { ImageContent } from '@slopus/happy-wire';
 import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "./utils/sdkToLogConverter";
@@ -293,6 +294,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
         let pending: {
             message: string;
             mode: EnhancedMode;
+            images?: ImageContent[];
         } | null = null;
 
         // Track session ID to detect when it actually changes
@@ -357,7 +359,8 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                             permissionHandler.handleModeChange(mode.permissionMode);
                             return {
                                 message: msg.message,
-                                mode: msg.mode
+                                mode: msg.mode,
+                                ...(msg.images ? { images: msg.images } : {}),
                             }
                         }
 

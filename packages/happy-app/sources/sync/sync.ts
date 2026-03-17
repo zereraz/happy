@@ -13,6 +13,7 @@ import { randomUUID } from 'expo-crypto';
 import * as Notifications from 'expo-notifications';
 import { registerPushToken } from './apiPush';
 import { Platform, AppState, type AppStateStatus } from 'react-native';
+import type { ImageContent } from '@slopus/happy-wire';
 import { isRunningOnMac } from '@/utils/platform';
 import { NormalizedMessage, normalizeRawMessage, RawRecord } from './typesRaw';
 import { applySettings, Settings, settingsDefaults, settingsParse, SUPPORTED_SCHEMA_VERSION } from './settings';
@@ -450,7 +451,7 @@ class Sync {
         this.backgroundSendStartedAt = null;
     }
 
-    async sendMessage(sessionId: string, text: string, displayText?: string) {
+    async sendMessage(sessionId: string, text: string, displayText?: string, images?: ImageContent[]) {
 
         // Get encryption
         const encryption = this.encryption.getSessionEncryption(sessionId);
@@ -497,6 +498,7 @@ class Sync {
                 type: 'text',
                 text
             },
+            ...(images?.length ? { images } : {}),
             meta: {
                 sentFrom,
                 permissionMode,
