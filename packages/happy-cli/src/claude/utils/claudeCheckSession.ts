@@ -2,8 +2,44 @@ import { logger } from "@/ui/logger";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getProjectPath } from "./path";
+import { autoRestoreSession } from "@/modules/sessionRestore";
 
+/**
+ * Check if a Claude Code session file exists and is valid.
+ * If the JSONL is missing, attempts to auto-restore from the Happy server.
+ *
+ * Returns true synchronously if the file exists and is valid.
+ * For auto-restore (async), use claudeCheckSessionAsync instead.
+ */
 export function claudeCheckSession(sessionId: string, path: string) {
+    return checkSessionFile(sessionId, path);
+}
+
+/**
+ * Check session file + auto-restore from server if missing.
+ * This is the async version that should be used when network access is acceptable.
+ */
+export async function claudeCheckSessionAsync(sessionId: string, path: string): Promise<boolean> {
+    if (checkSessionFile(sessionId, path)) {
+        return true;
+    }
+
+    // JSONL missing — try auto-restoring from the Happy server
+    logger.debug(`[claudeCheckSession] Session ${sessionId} missing locally, attempting server restore...`);
+    try {
+        const restored = await autoRestoreSession(sessionId, path);
+        if (restored) {
+            logger.debug(`[claudeCheckSession] Session ${sessionId} restored from server`);
+            return checkSessionFile(sessionId, path);
+        }
+    } catch (e) {
+        logger.debug(`[claudeCheckSession] Auto-restore failed:`, e);
+    }
+
+    return false;
+}
+
+function checkSessionFile(sessionId: string, path: string): boolean {
     const projectDir = getProjectPath(path);
 
     // Check if session id is in the project dir

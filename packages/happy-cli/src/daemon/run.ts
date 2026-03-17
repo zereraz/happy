@@ -411,8 +411,9 @@ export async function startDaemon(): Promise<void> {
           const tmuxEnv: Record<string, string> = {};
 
           // Add all daemon environment variables (filtering out undefined)
+          // Strip CLAUDECODE to prevent "cannot be launched inside another Claude Code session" errors
           for (const [key, value] of Object.entries(process.env)) {
-            if (value !== undefined) {
+            if (value !== undefined && key !== 'CLAUDECODE') {
               tmuxEnv[key] = value;
             }
           }
@@ -523,12 +524,14 @@ export async function startDaemon(): Promise<void> {
           if (options.resumeEncryptionVariant) {
             resumeEnv.HAPPY_RESUME_ENCRYPTION_VARIANT = options.resumeEncryptionVariant;
           }
+          // Strip CLAUDECODE to prevent "cannot be launched inside another Claude Code session" errors
+          const { CLAUDECODE: _, ...cleanProcessEnv } = process.env;
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true,  // Sessions stay alive when daemon stops
             stdio: ['ignore', 'pipe', 'pipe'],  // Capture stdout/stderr for debugging
             env: {
-              ...process.env,
+              ...cleanProcessEnv,
               ...extraEnv,
               ...resumeEnv
             }

@@ -184,8 +184,6 @@ export async function claudeLocal(opts: {
 
     // Spawn the process
     try {
-        // Start the interactive process
-        process.stdin.pause();
         await new Promise<void>((r, reject) => {
             const args: string[] = []
 
@@ -389,7 +387,6 @@ export async function claudeLocal(opts: {
             })().catch(reject);
         });
     } finally {
-        process.stdin.resume();
         if (stopThinkingTimeout) {
             clearTimeout(stopThinkingTimeout);
             stopThinkingTimeout = null;

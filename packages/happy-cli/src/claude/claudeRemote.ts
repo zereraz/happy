@@ -43,9 +43,9 @@ export async function claudeRemote(opts: {
     onSessionReset?: () => void
 }) {
 
-    // Check if session is valid
+    // Check if session is valid (with auto-restore from server if JSONL missing)
     let startFrom = opts.sessionId;
-    if (opts.sessionId && !claudeCheckSession(opts.sessionId, opts.path)) {
+    if (opts.sessionId && !(await claudeCheckSessionAsync(opts.sessionId, opts.path))) {
         startFrom = null;
     }
     
